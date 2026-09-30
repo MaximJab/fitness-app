@@ -1,5 +1,5 @@
 // Offline-Cache. Bei jeder Änderung an App-Dateien VERSION erhöhen.
-const VERSION='v2';
+const VERSION='v3';
 const CACHE='fitapp-'+VERSION;
 const FILES=['./','index.html','app.css','engine.js','exercises.js','app.js','manifest.webmanifest','icon.svg',
  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'];
