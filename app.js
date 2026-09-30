@@ -219,7 +219,7 @@ function initThumbs(){if(TH||!window.THREE)return TH;
  requestAnimationFrame(thumbLoop);return TH;}
 function observeThumbs(){if(!initThumbs())return;TH.io.disconnect();TH.vis.clear();document.querySelectorAll('#exList canvas.thumb').forEach(c=>{c._drawn=false;TH.io.observe(c);});}
 function thumbLoop(now){requestAnimationFrame(thumbLoop);
- if(now-TH.last<50||document.hidden||view!=='exercises'||!$('#sheet').hidden)return;TH.last=now;
+ if(now-TH.last<50||view!=='exercises'||!$('#sheet').hidden)return;TH.last=now;
  TH.vis.forEach(c=>{const ex=byId[c.dataset.ex];if(!ex||!ex.keys||(TH.still&&c._drawn))return;
   const t=TH.still?.35:(now/1000/ex.period)%1,cm=Object.assign({x:0,y:.92,R:3.9,h:1.2,az:.45},ex.cam||{});
   TH.E.setProps(ex);TH.E.apply(ex,t);
