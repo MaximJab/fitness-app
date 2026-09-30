@@ -66,7 +66,7 @@ function renderExercises(){
    &&(fWeight==='Alle'||(fWeight==='neu'?W[e.id]==null:W[e.id]===+fWeight)));
   if(!items.length)return;
   html+=`<div class="gh">${esc(g)}<span>${items.length}</span></div>`;
-  items.forEach(e=>{const w=W[e.id];html+=`<div class="row">${e.keys?`<button class="thumb-btn" data-open="${e.id}" aria-label="${esc(e.name)} ansehen"><canvas class="thumb" width="112" height="112" data-ex="${e.id}"></canvas></button>`:'<span class="thumb-btn none"></span>'}<button class="row-main" data-open="${e.id}"><b>${esc(e.name)}</b><small>${esc(e.level)}, ${esc(e.equip||kbLabel(e))}</small></button>
+  items.forEach(e=>{const w=W[e.id];html+=`<div class="row">${e.keys?`<button class="thumb-btn" data-open="${e.id}" aria-label="${esc(e.name)} ansehen"><canvas class="thumb" width="128" height="128" data-ex="${e.id}"></canvas></button>`:'<span class="thumb-btn none"></span>'}<button class="row-main" data-open="${e.id}"><b>${esc(e.name)}</b><small>${esc(e.level)}, ${esc(e.equip||kbLabel(e))}</small></button>
    ${w!=null&&e.kbCount?`<span class="wt">${w} kg</span>`:''}<button class="add${inW.has(e.id)?' in':''}" data-add="${e.id}" aria-label="${esc(e.name)} zum Workout hinzufügen">${inW.has(e.id)?'✓':'+'}</button></div>`;});});
  $('#exList').innerHTML=html||'<p class="empty">Keine Übung gefunden.</p>';
  $('#exList').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openSheet(b.dataset.open));
@@ -209,8 +209,8 @@ addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden)closeShe
 // ---------- Mini-Animationen in der Übungsliste (ein gemeinsamer Renderer, nur sichtbare Zeilen)
 let TH=null;
 function initThumbs(){if(TH||!window.THREE)return TH;
- const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(1);renderer.setSize(112,112,false);
- const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(35,1,.1,50);
+ const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(1);renderer.setSize(128,128,false);
+ const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(29,1,.1,50);
  scene.add(new THREE.HemisphereLight(0xffffff,0x6b6b6b,.95));const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(2,4,3);scene.add(dl);
  const floor=new THREE.Mesh(new THREE.CircleGeometry(1.2,48),new THREE.MeshStandardMaterial({color:0x9aa4ad,transparent:true,opacity:.45}));floor.rotation.x=-Math.PI/2;scene.add(floor);
  const vis=new Set();
