@@ -15,11 +15,17 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast(
 const P=()=>S.profiles.find(p=>p.id===S.active);
 const D=()=>S.data[S.active];
 function newProfile(name){const id=uid();S.profiles.push({id,name,created:new Date().toISOString()});
- S.data[id]={weights:{},inventory:{8:1,12:1,16:1},draft:{name:'',items:[]},templates:[],sessions:[]};S.active=id;save();}
+ S.data[id]={weights:{},inventory:{8:1,12:1,16:1},draft:{name:'',items:[]},templates:[],sessions:[],settings:{sets:3,reps:10}};S.active=id;save();}
 
 // ---------- Hilfen
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1800);}
-function defaultPlan(ex){const m=/(\d+)\s*×\s*(\d+)/.exec(ex.volume||'');return{sets:m?+m[1]:3,reps:m?+m[2]:10};}
+const settings=()=>(D().settings||(D().settings={sets:3,reps:10}));
+// Vorauswahl: letzte gespeicherte Einheit dieser Übung, sonst Standardwerte aus dem Profil
+function lastEntry(exId){const ss=D().sessions;for(let i=ss.length-1;i>=0;i--){const e=ss[i].entries.find(x=>x.exId===exId);if(e&&e.sets.length)return e;}return null;}
+function defaultPlan(ex){const last=lastEntry(ex.id),st=settings();
+ const reps=last?last.sets.map(s=>s.r):Array(st.sets).fill(st.reps);
+ const w=ex.kbCount===0?0:(D().weights[ex.id]??(last?Math.max(...last.sets.map(s=>s.w||0)):defaultWeight(ex)));
+ return{reps,w};}
 function defaultWeight(ex){if(ex.kbCount===0)return 0;const w=D().weights[ex.id];if(w!=null)return w;
  const inv=Object.keys(D().inventory).map(Number).filter(k=>D().inventory[k]>0).sort((a,b)=>a-b);return inv[0]??8;}
 const kbLabel=ex=>ex.kbCount===2?'2 Kettlebells':ex.kbCount===1?'1 Kettlebell':'ohne Kettlebell';
@@ -76,64 +82,99 @@ $('#q').addEventListener('input',()=>renderExercises());
 
 function addToWorkout(exId){const ex=byId[exId],d=D().draft;
  if(d.items.some(i=>i.exId===exId)){toast('Schon im Workout');return;}
- const pl=defaultPlan(ex),w=defaultWeight(ex);d.items.push({exId,sets:Array.from({length:pl.sets},()=>({w,r:pl.reps,done:false}))});
+ const pl=defaultPlan(ex);d.items.push({exId,w:pl.w,sets:pl.reps.map(r=>({r,done:false}))});
  save();toast(ex.name+' hinzugefügt');const n=d.items.length;$('#wBadge').hidden=!n;$('#wBadge').textContent=n;}
 
 // ---------- Workout
+// Ältere Datenstände (Gewicht pro Satz) auf ein Gewicht pro Übung umstellen
+function normItem(it){if(it.w==null)it.w=it.sets[0]?.w??0;it.sets.forEach(s=>delete s.w);return it;}
 function kbNeeds(items){const need={};
- items.forEach(it=>{const ex=byId[it.exId];if(!ex||!ex.kbCount)return;
-  new Set(it.sets.map(s=>+s.w).filter(w=>w>0)).forEach(w=>{need[w]=Math.max(need[w]||0,ex.kbCount);});});
+ items.forEach(it=>{const ex=byId[it.exId];if(!ex||!ex.kbCount||!(+it.w>0))return;need[it.w]=Math.max(need[it.w]||0,ex.kbCount);});
  return Object.entries(need).map(([w,n])=>({w:+w,n})).sort((a,b)=>a.w-b.w);}
-function renderWorkout(){const d=D().draft,v=$('#view-workout');
+function kbNeedHtml(items){const needs=kbNeeds(items),inv=D().inventory;
+ return needs.length?`<div class="kb-need">${needs.map(x=>{const have=+inv[x.w]||0,miss=Math.max(0,x.n-have);return`<span class="${miss?'miss':''}">${x.n} × ${x.w} kg${miss?` <em>(${miss} fehlt)</em>`:''}</span>`;}).join('')}</div>`:'<p class="note">Keine Kettlebells nötig.</p>';}
+function stepWeight(w,dir){const i=KB_SIZES.findIndex(k=>dir>0?k>w:k>=w);if(dir>0)return i<0?w+4:KB_SIZES[i];return i<=0?Math.max(0,w-(w>KB_SIZES[KB_SIZES.length-1]?4:2)):KB_SIZES[i-1];}
+const GRIP='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+function renderWorkout(){const d=D().draft,v=$('#view-workout');d.items.forEach(normItem);
  const tpl=D().templates;
  const tplHtml=tpl.length?`<div class="card"><h3>Gespeicherte Workouts</h3>${tpl.map(t=>`<div class="prof"><b>${esc(t.name)}</b><span class="note">${t.items.length} Übungen</span><button class="icon-btn" data-load="${t.id}" aria-label="${esc(t.name)} laden">↺</button><button class="icon-btn" data-deltpl="${t.id}" aria-label="${esc(t.name)} löschen">✕</button></div>`).join('')}</div>`:'';
  if(!d.items.length){v.innerHTML=`<p class="empty">Noch keine Übungen im Workout.<br>Tippe in der Übungsliste auf <b>+</b>.</p><button class="btn" id="toEx">Übungen ansehen</button>${tplHtml}`;
   $('#toEx').onclick=()=>go('exercises');bindTpl();return;}
- const needs=kbNeeds(d.items),inv=D().inventory;
  let html=`<input class="field" id="wName" placeholder="Name des Workouts (optional)" value="${esc(d.name)}">
- <div class="card"><h3>Benötigte Kettlebells</h3>${needs.length?`<div class="kb-need">${needs.map(x=>{const have=+inv[x.w]||0,miss=Math.max(0,x.n-have);return`<span class="${miss?'miss':''}">${x.n} × ${x.w} kg${miss?` <em>(${miss} fehlt)</em>`:''}</span>`;}).join('')}</div>`:'<p class="note">Keine Kettlebells nötig.</p>'}</div>`;
+ <button class="btn" id="startW">${d.startedAt?'Übersicht anzeigen':'Workout starten'}</button>
+ <div class="card"><h3>Benötigte Kettlebells</h3>${kbNeedHtml(d.items)}</div><div id="wItems">`;
  d.items.forEach((it,i)=>{const ex=byId[it.exId];if(!ex)return;
-  html+=`<div class="card" data-i="${i}"><div class="ex-head"><button class="name" data-open="${ex.id}">${esc(ex.name)}<small>${esc(kbLabel(ex))}, Ziel ${esc(ex.volume)}</small></button>
-  <div class="inline"><button class="icon-btn" data-up="${i}" aria-label="Nach oben" ${i?'':'disabled'}>↑</button><button class="icon-btn" data-rm="${i}" aria-label="${esc(ex.name)} entfernen">✕</button></div></div>
-  <table class="sets"><thead><tr><th>Satz</th><th>${ex.kbCount?'kg'+(ex.kbCount===2?' je Glocke':''):'kg'}</th><th>Wdh.</th><th class="chk">✓</th><th></th></tr></thead><tbody>
-  ${it.sets.map((s,j)=>`<tr class="${s.done?'done':''}"><td class="n">${j+1}</td><td><input type="number" inputmode="decimal" min="0" step="0.5" value="${s.w}" data-w="${i}.${j}" aria-label="Gewicht Satz ${j+1}"></td>
+  html+=`<div class="card ex-card" data-i="${i}"><div class="ex-head"><button class="drag" type="button" aria-label="${esc(ex.name)} verschieben">${GRIP}</button><button class="name" data-open="${ex.id}">${esc(ex.name)}<small>${esc(kbLabel(ex))}</small></button>
+  <button class="icon-btn" data-rm="${i}" aria-label="${esc(ex.name)} entfernen">✕</button></div>
+  <div class="wrow"><span>Gewicht${ex.kbCount===2?' je Glocke':''}</span><div class="stepper"><button type="button" data-wd="${i}" aria-label="Weniger Gewicht">−</button><input type="number" inputmode="decimal" min="0" step="0.5" value="${it.w}" data-w="${i}" aria-label="Gewicht in kg"><button type="button" data-wu="${i}" aria-label="Mehr Gewicht">+</button></div><span>kg</span></div>
+  <table class="sets"><thead><tr><th>Satz</th><th>Wiederholungen</th><th class="chk">✓</th><th></th></tr></thead><tbody>
+  ${it.sets.map((s,j)=>`<tr class="${s.done?'done':''}"><td class="n">${j+1}</td>
    <td><input type="number" inputmode="numeric" min="0" step="1" value="${s.r}" data-r="${i}.${j}" aria-label="Wiederholungen Satz ${j+1}"></td>
    <td class="chk"><input type="checkbox" ${s.done?'checked':''} data-d="${i}.${j}" aria-label="Satz ${j+1} erledigt"></td>
    <td class="del"><button class="icon-btn" data-ds="${i}.${j}" aria-label="Satz ${j+1} löschen">−</button></td></tr>`).join('')}
   </tbody></table><button class="link" data-as="${i}">+ Satz</button></div>`;});
- html+=`<button class="btn" id="finish">Training speichern</button><div class="btn-row"><button class="btn sec" id="saveTpl">Als Workout speichern</button><button class="btn danger" id="clear">Leeren</button></div>${tplHtml}`;
+ html+=`</div><button class="btn" id="finish">Training speichern</button><div class="btn-row"><button class="btn sec" id="saveTpl">Als Workout speichern</button><button class="btn danger" id="clear">Leeren</button></div>${tplHtml}`;
  v.innerHTML=html;
  const at=s=>s.split('.').map(Number);
+ const setW=(i,w)=>{d.items[i].w=Math.max(0,Math.round(w*2)/2);save();renderWorkout();};
  $('#wName').oninput=e=>{d.name=e.target.value;save();};
- v.querySelectorAll('[data-w]').forEach(el=>el.onchange=()=>{const[i,j]=at(el.dataset.w);d.items[i].sets[j].w=Math.max(0,parseFloat(el.value)||0);
-  for(let k=j+1;k<d.items[i].sets.length;k++)if(!d.items[i].sets[k].done)d.items[i].sets[k].w=d.items[i].sets[j].w;save();renderWorkout();});
+ v.querySelectorAll('[data-w]').forEach(el=>el.onchange=()=>setW(+el.dataset.w,parseFloat(el.value)||0));
+ v.querySelectorAll('[data-wu]').forEach(el=>el.onclick=()=>setW(+el.dataset.wu,stepWeight(+d.items[+el.dataset.wu].w||0,1)));
+ v.querySelectorAll('[data-wd]').forEach(el=>el.onclick=()=>setW(+el.dataset.wd,stepWeight(+d.items[+el.dataset.wd].w||0,-1)));
  v.querySelectorAll('[data-r]').forEach(el=>el.onchange=()=>{const[i,j]=at(el.dataset.r);d.items[i].sets[j].r=Math.max(0,parseInt(el.value)||0);save();});
  v.querySelectorAll('[data-d]').forEach(el=>el.onchange=()=>{const[i,j]=at(el.dataset.d);d.items[i].sets[j].done=el.checked;el.closest('tr').classList.toggle('done',el.checked);save();});
  v.querySelectorAll('[data-ds]').forEach(el=>el.onclick=()=>{const[i,j]=at(el.dataset.ds);d.items[i].sets.splice(j,1);if(!d.items[i].sets.length)d.items.splice(i,1);save();render();});
- v.querySelectorAll('[data-as]').forEach(el=>el.onclick=()=>{const it=d.items[+el.dataset.as],l=it.sets[it.sets.length-1];it.sets.push({w:l?l.w:defaultWeight(byId[it.exId]),r:l?l.r:10,done:false});save();renderWorkout();});
+ v.querySelectorAll('[data-as]').forEach(el=>el.onclick=()=>{const it=d.items[+el.dataset.as],l=it.sets[it.sets.length-1];it.sets.push({r:l?l.r:settings().reps,done:false});save();renderWorkout();});
  v.querySelectorAll('[data-rm]').forEach(el=>el.onclick=()=>{d.items.splice(+el.dataset.rm,1);save();render();});
- v.querySelectorAll('[data-up]').forEach(el=>el.onclick=()=>{const i=+el.dataset.up;[d.items[i-1],d.items[i]]=[d.items[i],d.items[i-1]];save();renderWorkout();});
  v.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openSheet(b.dataset.open));
+ v.querySelectorAll('.drag').forEach(bindDrag);
+ $('#startW').onclick=openStart;
  $('#finish').onclick=finishWorkout;
  $('#saveTpl').onclick=()=>{const name=(d.name||'').trim()||prompt('Name für das Workout:','Mein Workout');if(!name)return;
-  const items=d.items.map(it=>({exId:it.exId,sets:it.sets.map(s=>({w:s.w,r:s.r}))}));
+  const items=d.items.map(it=>({exId:it.exId,w:it.w,sets:it.sets.map(s=>({r:s.r}))}));
   const ex=D().templates.find(t=>t.name===name);if(ex){if(!confirm(`„${name}“ überschreiben?`))return;ex.items=items;}else D().templates.push({id:uid(),name,items});
   d.name=name;save();toast('Workout gespeichert');renderWorkout();};
- $('#clear').onclick=()=>{if(!confirm('Workout leeren? Nicht gespeicherte Einträge gehen verloren.'))return;d.items=[];d.name='';save();render();};
+ $('#clear').onclick=()=>{if(!confirm('Workout leeren? Nicht gespeicherte Einträge gehen verloren.'))return;d.items=[];d.name='';delete d.startedAt;save();render();};
  bindTpl();}
+// Reihenfolge per Ziehen am Griff ändern (Maus und Touch)
+function bindDrag(h){h.addEventListener('pointerdown',e=>{e.preventDefault();const card=h.closest('.ex-card'),box=$('#wItems');
+ card.classList.add('dragging');h.setPointerCapture(e.pointerId);let raf=0,y=e.clientY;
+ const scroll=()=>{if(y<90)scrollBy(0,-8);else if(y>innerHeight-130)scrollBy(0,8);raf=requestAnimationFrame(scroll);};raf=requestAnimationFrame(scroll);
+ const move=ev=>{y=ev.clientY;const others=[...box.querySelectorAll('.ex-card:not(.dragging)')];
+  const after=others.find(c=>{const r=c.getBoundingClientRect();return y<r.top+r.height/2;});
+  if(after){if(card.nextElementSibling!==after)box.insertBefore(card,after);}else if(box.lastElementChild!==card)box.appendChild(card);};
+ const up=()=>{cancelAnimationFrame(raf);h.removeEventListener('pointermove',move);h.removeEventListener('pointerup',up);h.removeEventListener('pointercancel',up);
+  const d=D().draft,old=d.items.slice(),order=[...box.querySelectorAll('.ex-card')].map(c=>+c.dataset.i);
+  d.items=order.map(i=>old[i]);save();renderWorkout();};
+ h.addEventListener('pointermove',move);h.addEventListener('pointerup',up);h.addEventListener('pointercancel',up);});}
 function bindTpl(){const v=$('#view-workout'),d=D().draft;
  v.querySelectorAll('[data-load]').forEach(b=>b.onclick=()=>{const t=D().templates.find(x=>x.id===b.dataset.load);if(!t)return;
   if(d.items.length&&!confirm('Aktuelles Workout ersetzen?'))return;
-  d.name=t.name;d.items=t.items.filter(it=>byId[it.exId]).map(it=>({exId:it.exId,sets:it.sets.map(s=>({w:D().weights[it.exId]??s.w,r:s.r,done:false}))}));save();render();});
+  d.name=t.name;delete d.startedAt;d.items=t.items.filter(it=>byId[it.exId]).map(it=>({exId:it.exId,w:D().weights[it.exId]??it.w??it.sets[0]?.w??0,sets:it.sets.map(s=>({r:s.r,done:false}))}));save();render();});
  v.querySelectorAll('[data-deltpl]').forEach(b=>b.onclick=()=>{const t=D().templates.find(x=>x.id===b.dataset.deltpl);if(!t||!confirm(`„${t.name}“ löschen?`))return;D().templates=D().templates.filter(x=>x!==t);save();renderWorkout();});}
-function finishWorkout(){const d=D().draft;
- const entries=d.items.map(it=>({exId:it.exId,sets:it.sets.filter(s=>s.done||s.r>0).map(s=>({w:+s.w,r:+s.r}))})).filter(e=>e.sets.length);
+// Übersicht beim Start: Bilder, Reihenfolge, Gewichte aus der Historie
+function openStart(){const d=D().draft;d.items.forEach(normItem);
+ d.items.forEach(it=>{const hw=D().weights[it.exId];if(hw!=null&&!d.startedAt)it.w=hw;});save();
+ $('#startBody').innerHTML=`<h2 class="start-title">${esc(d.name||'Dein Workout')}</h2><p class="note">${d.items.length} Übungen in dieser Reihenfolge</p>
+ <ol class="start-list">${d.items.map((it,i)=>{const ex=byId[it.exId];if(!ex)return'';const hw=D().weights[it.exId];
+  return`<li><span class="start-n">${i+1}</span>${ex.keys?`<canvas class="start-img" width="160" height="160" data-ex="${ex.id}"></canvas>`:'<span class="start-img"></span>'}
+  <div><b>${esc(ex.name)}</b><small>${it.sets.length} Sätze × ${it.sets.map(s=>s.r).join('/')} Wdh.</small>
+  ${ex.kbCount?`<span class="wt">${it.w} kg${ex.kbCount===2?' × 2':''}</span>${hw==null?'<small>noch kein Training gespeichert</small>':''}`:''}</div></li>`;}).join('')}</ol>
+ <div class="card"><h3>Benötigte Kettlebells</h3>${kbNeedHtml(d.items)}</div>
+ <button class="btn" id="startGo">${d.startedAt?'Weiter trainieren':'Training beginnen'}</button><button class="btn sec" id="startBack">Zurück</button>`;
+ $('#startSheet').hidden=false;document.body.style.overflow='hidden';
+ if(initThumbs())document.querySelectorAll('#startBody canvas.start-img').forEach(c=>drawStill(c,byId[c.dataset.ex]));
+ $('#startGo').onclick=()=>{if(!d.startedAt){d.startedAt=new Date().toISOString();save();}closeStart();renderWorkout();toast('Viel Erfolg!');};
+ $('#startBack').onclick=closeStart;$('#startClose').onclick=closeStart;}
+function closeStart(){$('#startSheet').hidden=true;document.body.style.overflow='';}
+function finishWorkout(){const d=D().draft;d.items.forEach(normItem);
+ const entries=d.items.map(it=>({exId:it.exId,sets:it.sets.filter(s=>s.done||s.r>0).map(s=>({w:+it.w,r:+s.r}))})).filter(e=>e.sets.length);
  if(!entries.length){toast('Keine Sätze eingetragen');return;}
  const undone=d.items.some(it=>it.sets.some(s=>!s.done));
  if(undone&&!confirm('Nicht alle Sätze sind abgehakt. Trotzdem mit den eingetragenen Werten speichern?'))return;
- D().sessions.push({id:uid(),date:new Date().toISOString(),name:d.name||'Training',entries});
- entries.forEach(e=>{if(byId[e.exId]&&byId[e.exId].kbCount){D().weights[e.exId]=Math.max(...e.sets.map(s=>s.w));}});
- d.items.forEach(it=>it.sets.forEach(s=>s.done=false));
+ D().sessions.push({id:uid(),date:d.startedAt||new Date().toISOString(),name:d.name||'Training',entries});
+ d.items.forEach(it=>{if(byId[it.exId]&&byId[it.exId].kbCount)D().weights[it.exId]=+it.w;});
+ d.items.forEach(it=>it.sets.forEach(s=>s.done=false));delete d.startedAt;
  save();toast('Training gespeichert');go('history');}
 
 // ---------- Verlauf
@@ -150,6 +191,8 @@ function renderProfile(){const v=$('#view-profile'),inv=D().inventory;
  v.innerHTML=`<div class="card"><h2>Profile</h2>${S.profiles.map(p=>`<div class="prof"><b>${esc(p.name)}</b>${p.id===S.active?'<span class="cur">Aktiv</span>':`<button class="chip" data-sw="${p.id}">Wechseln</button>`}</div>`).join('')}
   <div class="inline" style="margin-top:10px"><input class="field" id="npName" placeholder="Neues Profil"><button class="add" id="npAdd" aria-label="Profil anlegen">+</button></div></div>
  <div class="card"><h2>${esc(P().name)}</h2><div class="inline"><input class="field" id="rnName" value="${esc(P().name)}" aria-label="Profilname"><button class="chip" id="rnGo">Umbenennen</button></div></div>
+ <div class="card"><h3>Standardwerte für neue Übungen</h3><p class="note">Gilt, wenn eine Übung noch nie trainiert wurde. Sonst werden Sätze, Wiederholungen und Gewicht vom letzten Training übernommen.</p>
+  <div class="inv"><label>Sätze<input type="number" inputmode="numeric" min="1" max="20" value="${settings().sets}" data-set="sets"></label><label>Wiederholungen<input type="number" inputmode="numeric" min="1" max="100" value="${settings().reps}" data-set="reps"></label></div></div>
  <div class="card"><h3>Meine Kettlebells</h3><p class="note">Anzahl pro Gewicht. Das Workout zeigt, welche Glocken dir fehlen.</p>
   <div class="inv">${KB_SIZES.map(k=>`<label>${k} kg<input type="number" inputmode="numeric" min="0" max="9" value="${+inv[k]||0}" data-inv="${k}"></label>`).join('')}</div></div>
  <div class="card"><h3>Datensicherung</h3><p class="note">Alle Daten liegen nur auf diesem Gerät im Browser. Sichere sie regelmäßig als Datei. Beim Löschen der Website-Daten in Safari gehen sie sonst verloren.</p>
@@ -158,6 +201,7 @@ function renderProfile(){const v=$('#view-profile'),inv=D().inventory;
  v.querySelectorAll('[data-sw]').forEach(b=>b.onclick=()=>{S.active=b.dataset.sw;save();fWeight='Alle';render();toast('Profil gewechselt');});
  $('#npAdd').onclick=()=>{const n=$('#npName').value.trim();if(!n)return;newProfile(n);fWeight='Alle';render();toast('Profil angelegt');};
  $('#rnGo').onclick=()=>{const n=$('#rnName').value.trim();if(!n)return;P().name=n;save();render();};
+ v.querySelectorAll('[data-set]').forEach(el=>el.onchange=()=>{const v2=Math.max(1,parseInt(el.value)||1);settings()[el.dataset.set]=v2;el.value=v2;save();});
  v.querySelectorAll('[data-inv]').forEach(el=>el.onchange=()=>{inv[el.dataset.inv]=Math.max(0,parseInt(el.value)||0);save();});
  $('#exp').onclick=()=>{const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='fitness-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);};
@@ -204,7 +248,7 @@ function openSheet(id){const ex=byId[id];if(!ex)return;const hasAnim=!!ex.keys;
 function closeSheet(){$('#sheet').hidden=true;document.body.style.overflow='';if(R){R.ex=null;cancelAnimationFrame(R.raf);}}
 $('#sheetClose').onclick=closeSheet;
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet();});
-addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden)closeSheet();});
+addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#sheet').hidden)closeSheet();else if(!$('#startSheet').hidden)closeStart();});
 
 // ---------- Mini-Animationen in der Übungsliste (ein gemeinsamer Renderer, nur sichtbare Zeilen)
 let TH=null;
@@ -218,8 +262,11 @@ function initThumbs(){if(TH||!window.THREE)return TH;
  TH={renderer,scene,camera,E:KBEngine(THREE,scene),vis,io,last:0,still:matchMedia('(prefers-reduced-motion: reduce)').matches};
  requestAnimationFrame(thumbLoop);return TH;}
 function observeThumbs(){if(!initThumbs())return;TH.io.disconnect();TH.vis.clear();document.querySelectorAll('#exList canvas.thumb').forEach(c=>{c._drawn=false;TH.io.observe(c);});}
+function drawStill(c,ex){if(!ex||!ex.keys)return;const cm=Object.assign({x:0,y:.92,R:3.9,h:1.2,az:.45},ex.cam||{});
+ TH.E.setProps(ex);TH.E.apply(ex,.4);TH.camera.position.set(cm.x+cm.R*.95*Math.sin(cm.az),cm.h,cm.R*.95*Math.cos(cm.az));TH.camera.lookAt(cm.x,cm.y,0);
+ TH.renderer.render(TH.scene,TH.camera);const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(TH.renderer.domElement,0,0,c.width,c.height);}
 function thumbLoop(now){requestAnimationFrame(thumbLoop);
- if(now-TH.last<50||view!=='exercises'||!$('#sheet').hidden)return;TH.last=now;
+ if(now-TH.last<50||view!=='exercises'||!$('#sheet').hidden||!$('#startSheet').hidden)return;TH.last=now;
  TH.vis.forEach(c=>{const ex=byId[c.dataset.ex];if(!ex||!ex.keys||(TH.still&&c._drawn))return;
   const t=TH.still?.35:(now/1000/ex.period)%1,cm=Object.assign({x:0,y:.92,R:3.9,h:1.2,az:.45},ex.cam||{});
   TH.E.setProps(ex);TH.E.apply(ex,t);
