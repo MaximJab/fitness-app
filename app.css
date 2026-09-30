@@ -118,3 +118,7 @@ ol.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:26px
 .start-list .wt{display:inline-block;margin-top:4px}
 .start-n{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--bg);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px}
 .start-img{flex:0 0 auto;width:80px;height:80px;border-radius:14px;background:var(--stage);display:block}
+.wrow{flex-wrap:nowrap;gap:6px;font-size:13px}
+.wrow .stepper button{width:34px;height:38px;font-size:18px}
+.wrow .stepper input{width:40px;font-size:16px;padding:6px 0}
+.wrow .x{font-weight:700;color:var(--muted)}
