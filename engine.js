@@ -50,8 +50,10 @@ let curP=null;function kbPose(mode,out){if(mode==='floor'){out.pos.set(curP.kbx,
  out.q.setFromUnitVectors(DOWN,dir);return out;}
 const kA={pos:V(),q:new THREE.Quaternion(),bp:V()},kB={pos:V(),q:new THREE.Quaternion(),bp:V()};
 const propMat=new THREE.MeshStandardMaterial({color:0x8a7560,roughness:.85});const props=new THREE.Group();scene.add(props);
-function setProps(ex){while(props.children.length){const c=props.children.pop();c.geometry.dispose();}
- (ex.props||[]).forEach(b=>{const m=new THREE.Mesh(new THREE.BoxGeometry(b.w,b.h,b.d),propMat);m.position.set(b.x,b.h/2,b.z||0);props.add(m);});}
+const propCache=new Map();
+function setProps(ex){props.children.forEach(c=>c.visible=false);if(!ex.props)return;let g=propCache.get(ex);
+ if(!g){g=new THREE.Group();ex.props.forEach(b=>{const m=new THREE.Mesh(new THREE.BoxGeometry(b.w,b.h,b.d),propMat);m.position.set(b.x,b.h/2,b.z||0);g.add(m);});props.add(g);propCache.set(ex,g);}
+ g.visible=true;}
 function placeKB(K,mode,mode2,w){kbPose(mode,kA);if(mode2&&w>0){kbPose(mode2,kB);kA.pos.lerp(kB.pos,w);kA.q.slerp(kB.q,w);kA.bp.lerp(kB.bp,w);}
  K.g.position.copy(kA.pos);K.g.quaternion.copy(kA.q);K.b.position.copy(kA.bp);}
 function applyPose(ex,p){curP=p;const rel=ex.rel||{},lm=ex.legs||{};
