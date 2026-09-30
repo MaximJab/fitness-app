@@ -122,3 +122,4 @@ ol.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:26px
 .wrow .stepper button{width:34px;height:38px;font-size:18px}
 .wrow .stepper input{width:40px;font-size:16px;padding:6px 0}
 .wrow .x{font-weight:700;color:var(--muted)}
+@media (max-width:380px){.wrow{gap:4px}.wrow .stepper button{width:28px}.wrow .stepper input{width:34px}}
