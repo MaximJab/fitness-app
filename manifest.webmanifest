@@ -1,0 +1,12 @@
+{
+  "name": "Fitness",
+  "short_name": "Fitness",
+  "description": "Übungen, Workouts und Trainingsprotokoll",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EEF1F3",
+  "theme_color": "#E0591A",
+  "lang": "de",
+  "icons": [{"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]
+}

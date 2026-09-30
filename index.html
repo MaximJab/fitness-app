@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#E0591A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Fitness">
+<title>Fitness</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <h1 id="title">Übungen</h1>
+  <button class="profile-pill" id="profilePill" type="button"></button>
+</header>
+
+<main>
+  <section id="view-exercises" class="view">
+    <input class="search" id="q" type="search" placeholder="Übung oder Muskel suchen" aria-label="Übung oder Muskel suchen">
+    <div class="chips" id="groupChips" aria-label="Muskelgruppe"></div>
+    <div class="filter-label">Mein aktuelles Gewicht</div>
+    <div class="chips" id="weightChips" aria-label="Gewicht"></div>
+    <div id="exList"></div>
+  </section>
+
+  <section id="view-workout" class="view" hidden></section>
+  <section id="view-history" class="view" hidden></section>
+  <section id="view-profile" class="view" hidden></section>
+</main>
+
+<nav class="tabbar" aria-label="Navigation">
+  <button data-view="exercises" aria-current="page"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Übungen</button>
+  <button data-view="workout"><span class="tiw"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="5"/><path d="M5.5 10.5a3 3 0 0 1 5 0"/><path d="M15 9h6M15 13h6M15 17h4"/></svg><b class="badge" id="wBadge" hidden></b></span>Workout</button>
+  <button data-view="history"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>Verlauf</button>
+  <button data-view="profile"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Profil</button>
+</nav>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-inner">
+    <div class="sheet-head"><button class="icon-btn" id="sheetClose" type="button" aria-label="Schließen">✕</button></div>
+    <div class="stage" id="stage"><div class="phase" id="phase"></div></div>
+    <div class="stage-controls"><button id="pp" type="button">Pause</button><button id="sl" type="button">Zeitlupe</button><span>Seitlich wischen zum Drehen</span></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="engine.js"></script>
+<script src="exercises.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
