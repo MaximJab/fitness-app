@@ -1,3 +1,5 @@
+[hidden]{display:none!important}
+.icon-btn:disabled{opacity:.35}
 :root{--bg:#EEF1F3;--surface:#FFFFFF;--ink:#1C2430;--muted:#5B6875;--line:#D3DAE0;--accent:#E0591A;--accent-soft:#FBE3D6;--accent-ink:#8C330B;--stage:#E1E7EB;--ok:#2F7D4F;--ok-soft:#DDF0E3;--warn:#A33A1B;
 --display:"Barlow Condensed","Arial Narrow","Helvetica Neue",system-ui,sans-serif;--body:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;--tabh:62px;}
 @media (prefers-color-scheme:dark){:root{--bg:#12171C;--surface:#1A2129;--ink:#E6EBEE;--muted:#9AA6B1;--line:#2B353F;--accent:#F27435;--accent-soft:#3A2418;--accent-ink:#FFB68E;--stage:#172028;--ok:#6CCB91;--ok-soft:#173424;--warn:#FF9A7A;}}
