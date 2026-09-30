@@ -23,10 +23,8 @@ const settings=()=>(D().settings||(D().settings={sets:3,reps:10}));
 // Vorauswahl: letzte gespeicherte Einheit dieser Übung, sonst Standardwerte aus dem Profil
 function lastEntry(exId){const ss=D().sessions;for(let i=ss.length-1;i>=0;i--){const e=ss[i].entries.find(x=>x.exId===exId);if(e&&e.sets.length)return e;}return null;}
 function defaultPlan(ex){const last=lastEntry(ex.id),st=settings();
- const reps=last?last.sets.map(s=>s.r):Array(st.sets).fill(st.reps);
- const w=ex.kbCount===0?0:(D().weights[ex.id]??(last?Math.max(...last.sets.map(s=>s.w||0)):defaultWeight(ex)));
- return{reps,w};}
-function defaultWeight(ex){if(ex.kbCount===0)return 0;const w=D().weights[ex.id];if(w!=null)return w;
+ return last?{sets:last.sets.length,reps:last.sets[0].r}:{sets:st.sets,reps:st.reps};}
+function defaultWeight(ex){if(ex.kbCount===0)return 0;const w=D().weights[ex.id];if(w!=null)return w;const le=lastEntry(ex.id);if(le&&le.sets[0].w)return le.sets[0].w;
  const inv=Object.keys(D().inventory).map(Number).filter(k=>D().inventory[k]>0).sort((a,b)=>a-b);return inv[0]??8;}
 const kbLabel=ex=>ex.kbCount===2?'2 Kettlebells':ex.kbCount===1?'1 Kettlebell':'ohne Kettlebell';
 const fmtDate=iso=>new Date(iso).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
@@ -82,18 +80,19 @@ $('#q').addEventListener('input',()=>renderExercises());
 
 function addToWorkout(exId){const ex=byId[exId],d=D().draft;
  if(d.items.some(i=>i.exId===exId)){toast('Schon im Workout');return;}
- const pl=defaultPlan(ex);d.items.push({exId,w:pl.w,sets:pl.reps.map(r=>({r,done:false}))});
+ const pl=defaultPlan(ex);d.items.push({exId,sets:pl.sets,reps:pl.reps});
  save();toast(ex.name+' hinzugefügt');const n=d.items.length;$('#wBadge').hidden=!n;$('#wBadge').textContent=n;}
 
 // ---------- Workout
-// Ältere Datenstände (Gewicht pro Satz) auf ein Gewicht pro Übung umstellen
-function normItem(it){if(it.w==null)it.w=it.sets[0]?.w??0;it.sets.forEach(s=>delete s.w);return it;}
+// Ältere Datenstände (Satzliste) auf Satzanzahl und Wiederholungen umstellen
+function normItem(it){if(Array.isArray(it.sets)){const s=it.sets;it.reps=s[0]?.r??settings().reps;it.sets=s.length||settings().sets;}delete it.w;return it;}
+// Gewicht kommt aus der Historie bzw. „Mein aktuelles Gewicht“ in der Übungsansicht
+const wOf=it=>{const ex=byId[it.exId];return !ex||!ex.kbCount?0:defaultWeight(ex);};
 function kbNeeds(items){const need={};
- items.forEach(it=>{const ex=byId[it.exId];if(!ex||!ex.kbCount||!(+it.w>0))return;need[it.w]=Math.max(need[it.w]||0,ex.kbCount);});
+ items.forEach(it=>{const ex=byId[it.exId],w=wOf(it);if(!ex||!ex.kbCount||!(w>0))return;need[w]=Math.max(need[w]||0,ex.kbCount);});
  return Object.entries(need).map(([w,n])=>({w:+w,n})).sort((a,b)=>a.w-b.w);}
 function kbNeedHtml(items){const needs=kbNeeds(items),inv=D().inventory;
  return needs.length?`<div class="kb-need">${needs.map(x=>{const have=+inv[x.w]||0,miss=Math.max(0,x.n-have);return`<span class="${miss?'miss':''}">${x.n} × ${x.w} kg${miss?` <em>(${miss} fehlt)</em>`:''}</span>`;}).join('')}</div>`:'<p class="note">Keine Kettlebells nötig.</p>';}
-function stepWeight(w,dir){const i=KB_SIZES.findIndex(k=>dir>0?k>w:k>=w);if(dir>0)return i<0?w+4:KB_SIZES[i];return i<=0?Math.max(0,w-(w>KB_SIZES[KB_SIZES.length-1]?4:2)):KB_SIZES[i-1];}
 const GRIP='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
 function renderWorkout(){const d=D().draft,v=$('#view-workout');d.items.forEach(normItem);
  const tpl=D().templates;
@@ -103,38 +102,27 @@ function renderWorkout(){const d=D().draft,v=$('#view-workout');d.items.forEach(
  let html=`<input class="field" id="wName" placeholder="Name des Workouts (optional)" value="${esc(d.name)}">
  <button class="btn" id="startW">${d.startedAt?'Übersicht anzeigen':'Workout starten'}</button>
  <div class="card"><h3>Benötigte Kettlebells</h3>${kbNeedHtml(d.items)}</div><div id="wItems">`;
- d.items.forEach((it,i)=>{const ex=byId[it.exId];if(!ex)return;
-  html+=`<div class="card ex-card" data-i="${i}"><div class="ex-head"><button class="drag" type="button" aria-label="${esc(ex.name)} verschieben">${GRIP}</button><button class="name" data-open="${ex.id}">${esc(ex.name)}<small>${esc(kbLabel(ex))}</small></button>
+ d.items.forEach((it,i)=>{const ex=byId[it.exId];if(!ex)return;const w=wOf(it);
+  html+=`<div class="card ex-card" data-i="${i}"><div class="ex-head"><button class="drag" type="button" aria-label="${esc(ex.name)} verschieben">${GRIP}</button><button class="name" data-open="${ex.id}">${esc(ex.name)}<small>${ex.kbCount?`${w} kg${ex.kbCount===2?' × 2':''}`:esc(kbLabel(ex))}</small></button>
   <button class="icon-btn" data-rm="${i}" aria-label="${esc(ex.name)} entfernen">✕</button></div>
-  <div class="wrow"><span>Gewicht${ex.kbCount===2?' je Glocke':''}</span><div class="stepper"><button type="button" data-wd="${i}" aria-label="Weniger Gewicht">−</button><input type="number" inputmode="decimal" min="0" step="0.5" value="${it.w}" data-w="${i}" aria-label="Gewicht in kg"><button type="button" data-wu="${i}" aria-label="Mehr Gewicht">+</button></div><span>kg</span></div>
-  <table class="sets"><thead><tr><th>Satz</th><th>Wiederholungen</th><th class="chk">✓</th><th></th></tr></thead><tbody>
-  ${it.sets.map((s,j)=>`<tr class="${s.done?'done':''}"><td class="n">${j+1}</td>
-   <td><input type="number" inputmode="numeric" min="0" step="1" value="${s.r}" data-r="${i}.${j}" aria-label="Wiederholungen Satz ${j+1}"></td>
-   <td class="chk"><input type="checkbox" ${s.done?'checked':''} data-d="${i}.${j}" aria-label="Satz ${j+1} erledigt"></td>
-   <td class="del"><button class="icon-btn" data-ds="${i}.${j}" aria-label="Satz ${j+1} löschen">−</button></td></tr>`).join('')}
-  </tbody></table><button class="link" data-as="${i}">+ Satz</button></div>`;});
+  <div class="wrow"><span>Sätze</span><div class="stepper"><button type="button" data-k="sets" data-i="${i}" data-dir="-1" aria-label="Weniger Sätze">−</button><input type="number" inputmode="numeric" min="1" value="${it.sets}" data-f="sets" data-i="${i}" aria-label="Satzanzahl"><button type="button" data-k="sets" data-i="${i}" data-dir="1" aria-label="Mehr Sätze">+</button></div>
+  <span class="x">×</span><div class="stepper"><button type="button" data-k="reps" data-i="${i}" data-dir="-1" aria-label="Weniger Wiederholungen">−</button><input type="number" inputmode="numeric" min="1" value="${it.reps}" data-f="reps" data-i="${i}" aria-label="Wiederholungen pro Satz"><button type="button" data-k="reps" data-i="${i}" data-dir="1" aria-label="Mehr Wiederholungen">+</button></div><span>Wdh.</span></div></div>`;});
  html+=`</div><button class="btn" id="finish">Training speichern</button><div class="btn-row"><button class="btn sec" id="saveTpl">Als Workout speichern</button><button class="btn danger" id="clear">Leeren</button></div>${tplHtml}`;
  v.innerHTML=html;
- const at=s=>s.split('.').map(Number);
- const setW=(i,w)=>{d.items[i].w=Math.max(0,Math.round(w*2)/2);save();renderWorkout();};
+ const setV=(i,k,val)=>{d.items[i][k]=Math.max(1,Math.min(k==='sets'?20:200,Math.round(val)||1));save();renderWorkout();};
  $('#wName').oninput=e=>{d.name=e.target.value;save();};
- v.querySelectorAll('[data-w]').forEach(el=>el.onchange=()=>setW(+el.dataset.w,parseFloat(el.value)||0));
- v.querySelectorAll('[data-wu]').forEach(el=>el.onclick=()=>setW(+el.dataset.wu,stepWeight(+d.items[+el.dataset.wu].w||0,1)));
- v.querySelectorAll('[data-wd]').forEach(el=>el.onclick=()=>setW(+el.dataset.wd,stepWeight(+d.items[+el.dataset.wd].w||0,-1)));
- v.querySelectorAll('[data-r]').forEach(el=>el.onchange=()=>{const[i,j]=at(el.dataset.r);d.items[i].sets[j].r=Math.max(0,parseInt(el.value)||0);save();});
- v.querySelectorAll('[data-d]').forEach(el=>el.onchange=()=>{const[i,j]=at(el.dataset.d);d.items[i].sets[j].done=el.checked;el.closest('tr').classList.toggle('done',el.checked);save();});
- v.querySelectorAll('[data-ds]').forEach(el=>el.onclick=()=>{const[i,j]=at(el.dataset.ds);d.items[i].sets.splice(j,1);if(!d.items[i].sets.length)d.items.splice(i,1);save();render();});
- v.querySelectorAll('[data-as]').forEach(el=>el.onclick=()=>{const it=d.items[+el.dataset.as],l=it.sets[it.sets.length-1];it.sets.push({r:l?l.r:settings().reps,done:false});save();renderWorkout();});
+ v.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const i=+b.dataset.i,k=b.dataset.k;setV(i,k,d.items[i][k]+(+b.dataset.dir));});
+ v.querySelectorAll('[data-f]').forEach(el=>el.onchange=()=>setV(+el.dataset.i,el.dataset.f,parseInt(el.value)));
  v.querySelectorAll('[data-rm]').forEach(el=>el.onclick=()=>{d.items.splice(+el.dataset.rm,1);save();render();});
  v.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openSheet(b.dataset.open));
  v.querySelectorAll('.drag').forEach(bindDrag);
  $('#startW').onclick=openStart;
  $('#finish').onclick=finishWorkout;
  $('#saveTpl').onclick=()=>{const name=(d.name||'').trim()||prompt('Name für das Workout:','Mein Workout');if(!name)return;
-  const items=d.items.map(it=>({exId:it.exId,w:it.w,sets:it.sets.map(s=>({r:s.r}))}));
+  const items=d.items.map(it=>({exId:it.exId,sets:it.sets,reps:it.reps}));
   const ex=D().templates.find(t=>t.name===name);if(ex){if(!confirm(`„${name}“ überschreiben?`))return;ex.items=items;}else D().templates.push({id:uid(),name,items});
   d.name=name;save();toast('Workout gespeichert');renderWorkout();};
- $('#clear').onclick=()=>{if(!confirm('Workout leeren? Nicht gespeicherte Einträge gehen verloren.'))return;d.items=[];d.name='';delete d.startedAt;save();render();};
+ $('#clear').onclick=()=>{if(!confirm('Workout leeren?'))return;d.items=[];d.name='';delete d.startedAt;save();render();};
  bindTpl();}
 // Reihenfolge per Ziehen am Griff ändern (Maus und Touch)
 function bindDrag(h){h.addEventListener('pointerdown',e=>{e.preventDefault();const card=h.closest('.ex-card'),box=$('#wItems');
@@ -150,16 +138,15 @@ function bindDrag(h){h.addEventListener('pointerdown',e=>{e.preventDefault();con
 function bindTpl(){const v=$('#view-workout'),d=D().draft;
  v.querySelectorAll('[data-load]').forEach(b=>b.onclick=()=>{const t=D().templates.find(x=>x.id===b.dataset.load);if(!t)return;
   if(d.items.length&&!confirm('Aktuelles Workout ersetzen?'))return;
-  d.name=t.name;delete d.startedAt;d.items=t.items.filter(it=>byId[it.exId]).map(it=>({exId:it.exId,w:D().weights[it.exId]??it.w??it.sets[0]?.w??0,sets:it.sets.map(s=>({r:s.r,done:false}))}));save();render();});
+  d.name=t.name;delete d.startedAt;d.items=t.items.filter(it=>byId[it.exId]).map(it=>normItem({exId:it.exId,sets:Array.isArray(it.sets)?it.sets.map(s=>({r:s.r})):it.sets,reps:it.reps}));save();render();});
  v.querySelectorAll('[data-deltpl]').forEach(b=>b.onclick=()=>{const t=D().templates.find(x=>x.id===b.dataset.deltpl);if(!t||!confirm(`„${t.name}“ löschen?`))return;D().templates=D().templates.filter(x=>x!==t);save();renderWorkout();});}
 // Übersicht beim Start: Bilder, Reihenfolge, Gewichte aus der Historie
-function openStart(){const d=D().draft;d.items.forEach(normItem);
- d.items.forEach(it=>{const hw=D().weights[it.exId];if(hw!=null&&!d.startedAt)it.w=hw;});save();
+function openStart(){const d=D().draft;d.items.forEach(normItem);save();
  $('#startBody').innerHTML=`<h2 class="start-title">${esc(d.name||'Dein Workout')}</h2><p class="note">${d.items.length} Übungen in dieser Reihenfolge</p>
  <ol class="start-list">${d.items.map((it,i)=>{const ex=byId[it.exId];if(!ex)return'';const hw=D().weights[it.exId];
   return`<li><span class="start-n">${i+1}</span>${ex.keys?`<canvas class="start-img" width="160" height="160" data-ex="${ex.id}"></canvas>`:'<span class="start-img"></span>'}
-  <div><b>${esc(ex.name)}</b><small>${it.sets.length} Sätze × ${it.sets.map(s=>s.r).join('/')} Wdh.</small>
-  ${ex.kbCount?`<span class="wt">${it.w} kg${ex.kbCount===2?' × 2':''}</span>${hw==null?'<small>noch kein Training gespeichert</small>':''}`:''}</div></li>`;}).join('')}</ol>
+  <div><b>${esc(ex.name)}</b><small>${it.sets} Sätze × ${it.reps} Wdh.</small>
+  ${ex.kbCount?`<span class="wt">${wOf(it)} kg${ex.kbCount===2?' × 2':''}</span>${hw==null?'<small>noch kein Training gespeichert</small>':''}`:''}</div></li>`;}).join('')}</ol>
  <div class="card"><h3>Benötigte Kettlebells</h3>${kbNeedHtml(d.items)}</div>
  <button class="btn" id="startGo">${d.startedAt?'Weiter trainieren':'Training beginnen'}</button><button class="btn sec" id="startBack">Zurück</button>`;
  $('#startSheet').hidden=false;document.body.style.overflow='hidden';
@@ -168,14 +155,12 @@ function openStart(){const d=D().draft;d.items.forEach(normItem);
  $('#startBack').onclick=closeStart;$('#startClose').onclick=closeStart;}
 function closeStart(){$('#startSheet').hidden=true;document.body.style.overflow='';}
 function finishWorkout(){const d=D().draft;d.items.forEach(normItem);
- const entries=d.items.map(it=>({exId:it.exId,sets:it.sets.filter(s=>s.done||s.r>0).map(s=>({w:+it.w,r:+s.r}))})).filter(e=>e.sets.length);
- if(!entries.length){toast('Keine Sätze eingetragen');return;}
- const undone=d.items.some(it=>it.sets.some(s=>!s.done));
- if(undone&&!confirm('Nicht alle Sätze sind abgehakt. Trotzdem mit den eingetragenen Werten speichern?'))return;
+ const entries=d.items.filter(it=>byId[it.exId]).map(it=>{const w=wOf(it);return{exId:it.exId,sets:Array.from({length:it.sets},()=>({w,r:it.reps}))};});
+ if(!entries.length){toast('Keine Übungen im Workout');return;}
+ if(!confirm('Training mit den eingestellten Sätzen und Wiederholungen speichern?'))return;
  D().sessions.push({id:uid(),date:d.startedAt||new Date().toISOString(),name:d.name||'Training',entries});
- d.items.forEach(it=>{if(byId[it.exId]&&byId[it.exId].kbCount)D().weights[it.exId]=+it.w;});
- d.items.forEach(it=>it.sets.forEach(s=>s.done=false));delete d.startedAt;
- save();toast('Training gespeichert');go('history');}
+ entries.forEach(e=>{if(byId[e.exId].kbCount)D().weights[e.exId]=e.sets[0].w;});
+ delete d.startedAt;save();toast('Training gespeichert');go('history');}
 
 // ---------- Verlauf
 function renderHistory(){const ss=[...D().sessions].reverse(),v=$('#view-history');
