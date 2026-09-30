@@ -66,10 +66,11 @@ function renderExercises(){
    &&(fWeight==='Alle'||(fWeight==='neu'?W[e.id]==null:W[e.id]===+fWeight)));
   if(!items.length)return;
   html+=`<div class="gh">${esc(g)}<span>${items.length}</span></div>`;
-  items.forEach(e=>{const w=W[e.id];html+=`<div class="row"><button class="row-main" data-open="${e.id}"><b>${esc(e.name)}</b><small>${esc(e.level)}, ${esc(e.equip||kbLabel(e))}</small></button>
+  items.forEach(e=>{const w=W[e.id];html+=`<div class="row">${e.keys?`<button class="thumb-btn" data-open="${e.id}" aria-label="${esc(e.name)} ansehen"><canvas class="thumb" width="112" height="112" data-ex="${e.id}"></canvas></button>`:'<span class="thumb-btn none"></span>'}<button class="row-main" data-open="${e.id}"><b>${esc(e.name)}</b><small>${esc(e.level)}, ${esc(e.equip||kbLabel(e))}</small></button>
    ${w!=null&&e.kbCount?`<span class="wt">${w} kg</span>`:''}<button class="add${inW.has(e.id)?' in':''}" data-add="${e.id}" aria-label="${esc(e.name)} zum Workout hinzufügen">${inW.has(e.id)?'✓':'+'}</button></div>`;});});
  $('#exList').innerHTML=html||'<p class="empty">Keine Übung gefunden.</p>';
  $('#exList').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openSheet(b.dataset.open));
+ observeThumbs();
  $('#exList').querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{addToWorkout(b.dataset.add);renderExercises();});}
 $('#q').addEventListener('input',()=>renderExercises());
 
@@ -204,6 +205,26 @@ function closeSheet(){$('#sheet').hidden=true;document.body.style.overflow='';if
 $('#sheetClose').onclick=closeSheet;
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet();});
 addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden)closeSheet();});
+
+// ---------- Mini-Animationen in der Übungsliste (ein gemeinsamer Renderer, nur sichtbare Zeilen)
+let TH=null;
+function initThumbs(){if(TH||!window.THREE)return TH;
+ const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(1);renderer.setSize(112,112,false);
+ const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(35,1,.1,50);
+ scene.add(new THREE.HemisphereLight(0xffffff,0x6b6b6b,.95));const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(2,4,3);scene.add(dl);
+ const floor=new THREE.Mesh(new THREE.CircleGeometry(1.2,48),new THREE.MeshStandardMaterial({color:0x9aa4ad,transparent:true,opacity:.45}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+ const vis=new Set();
+ const io=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting?vis.add(e.target):vis.delete(e.target)),{rootMargin:'100px'});
+ TH={renderer,scene,camera,E:KBEngine(THREE,scene),vis,io,last:0,still:matchMedia('(prefers-reduced-motion: reduce)').matches};
+ requestAnimationFrame(thumbLoop);return TH;}
+function observeThumbs(){if(!initThumbs())return;TH.io.disconnect();TH.vis.clear();document.querySelectorAll('#exList canvas.thumb').forEach(c=>{c._drawn=false;TH.io.observe(c);});}
+function thumbLoop(now){requestAnimationFrame(thumbLoop);
+ if(now-TH.last<50||document.hidden||view!=='exercises'||!$('#sheet').hidden)return;TH.last=now;
+ TH.vis.forEach(c=>{const ex=byId[c.dataset.ex];if(!ex||!ex.keys||(TH.still&&c._drawn))return;
+  const t=TH.still?.35:(now/1000/ex.period)%1,cm=Object.assign({x:0,y:.92,R:3.9,h:1.2,az:.45},ex.cam||{});
+  TH.E.setProps(ex);TH.E.apply(ex,t);
+  TH.camera.position.set(cm.x+cm.R*.95*Math.sin(cm.az),cm.h,cm.R*.95*Math.cos(cm.az));TH.camera.lookAt(cm.x,cm.y,0);
+  TH.renderer.render(TH.scene,TH.camera);const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(TH.renderer.domElement,0,0,c.width,c.height);c._drawn=true;});}
 
 // ---------- Start
 if(S.active&&!P())S.active=S.profiles[0]?.id||null;
