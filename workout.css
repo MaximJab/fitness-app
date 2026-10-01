@@ -1,0 +1,5 @@
+/* Ergänzende Styles für den Reiter „Workout“ */
+.ex-card .ex-head{gap:8px}
+.ex-card .thumb-btn,.ex-card .thumb{width:56px;height:56px}
+.ex-card .name small{font-family:var(--body);font-weight:500}
+.wsel{flex:0 1 auto;min-width:120px;padding:9px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:16px;font-weight:700}

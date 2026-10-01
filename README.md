@@ -2,11 +2,12 @@
 
 Web-App für Kettlebell-Training (später auch andere Übungen). Läuft als statische Seite über GitHub Pages und lässt sich auf dem iPhone über Safari → Teilen → „Zum Home-Bildschirm“ wie eine App installieren.
 
-## Funktionen (erster Entwurf)
+## Funktionen
 - Benutzerprofile (mehrere pro Gerät)
 - Übungsdatenbank mit 3D-Animation, Filter nach Muskelgruppe und aktuellem Kettlebell-Gewicht
 - Übungen per „+“ ins Workout übernehmen
-- Pro Satz Gewicht und Wiederholungen eintragen, Training speichern (Verlauf)
+- Pro Übung Sätze, Wiederholungen und Gewicht festlegen, Reihenfolge per Ziehen ändern, Training speichern (Verlauf)
+- Start-Übersicht mit Bildern, Reihenfolge und Gewichten
 - Workouts als Vorlage speichern und wieder laden
 - Anzeige der benötigten Kettlebells im Workout, abgeglichen mit „Meine Kettlebells“
 - Export/Import als JSON-Sicherung
@@ -19,7 +20,13 @@ GitHub Pages liefert nur Dateien aus. Profile und Trainingsdaten liegen deshalb 
 |---|---|
 | `index.html` | Grundgerüst, Navigation |
 | `app.css` | Gestaltung |
-| `app.js` | Profile, Übungsliste, Workout, Verlauf, Speicherung |
+| `workout.css` | Ergänzende Gestaltung für den Reiter „Workout“ |
+| `js/core.js` | Speicher, Hilfsfunktionen, Navigation, Onboarding |
+| `js/exercises-view.js` | Reiter „Übungen“ |
+| `js/workout.js` | Reiter „Workout“, Start-Übersicht, Training speichern |
+| `js/history-profile.js` | Reiter „Verlauf“ und „Profil“ |
+| `js/detail.js` | Detailansicht und Mini-Animationen |
+| `js/main.js` | Start der App |
 | `engine.js` | 3D-Modell und Animations-Engine (three.js r128) |
 | `exercises.js` | Übungsdatenbank |
 | `sw.js` | Offline-Cache (bei Änderungen `VERSION` erhöhen) |
