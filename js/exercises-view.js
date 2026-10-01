@@ -17,9 +17,9 @@ function renderExercises(){
   if(!items.length)return;
   html+=`<div class="gh">${esc(g)}<span>${items.length}</span></div>`;
   items.forEach(e=>{const w=W[e.id];html+=`<div class="row">${e.keys?`<button class="thumb-btn" data-open="${e.id}" aria-label="${esc(e.name)} ansehen"><canvas class="thumb" width="128" height="128" data-ex="${e.id}"></canvas></button>`:'<span class="thumb-btn none"></span>'}<button class="row-main" data-open="${e.id}"><b>${esc(e.name)}</b><small>${esc(e.level)}, ${esc(e.equip||kbLabel(e))}</small></button>
-   ${w!=null&&e.kbCount?`<span class="wt">${w} kg</span>`:''}<button class="add${inW.has(e.id)?' in':''}" data-add="${e.id}" aria-label="${esc(e.name)} zum Workout hinzufügen">${inW.has(e.id)?'✓':'+'}</button></div>`;});});
+   ${w!=null&&e.kbCount?`<span class="wt">${w} kg</span>`:''}<button class="add${inW.has(e.id)?' in':''}" data-add="${e.id}" aria-label="${esc(e.name)} ${inW.has(e.id)?'aus dem Workout entfernen':'zum Workout hinzufügen'}">${inW.has(e.id)?'✓':'+'}</button></div>`;});});
  $('#exList').innerHTML=html||'<p class="empty">Keine Übung gefunden.</p>';
  $('#exList').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openSheet(b.dataset.open));
  observeThumbs();
- $('#exList').querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{addToWorkout(b.dataset.add);renderExercises();});}
+ $('#exList').querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const id=b.dataset.add;if(D().draft.items.some(i=>i.exId===id))removeFromWorkout(id);else addToWorkout(id);renderExercises();});}
 $('#q').addEventListener('input',()=>renderExercises());

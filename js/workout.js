@@ -1,5 +1,7 @@
 // Reiter „Workout“: Übungen planen, Start-Übersicht, Training speichern
 // Teil der Fitness-App. Alle js/*.js-Dateien teilen sich den globalen Gültigkeitsbereich; Reihenfolge siehe index.html.
+function removeFromWorkout(exId){const d=D().draft,ex=byId[exId];d.items=d.items.filter(i=>i.exId!==exId);
+ save();toast((ex?ex.name:'Übung')+' entfernt');const n=d.items.length;$('#wBadge').hidden=!n;$('#wBadge').textContent=n;}
 function addToWorkout(exId){const ex=byId[exId],d=D().draft;
  if(d.items.some(i=>i.exId===exId)){toast('Schon im Workout');return;}
  const pl=defaultPlan(ex);d.items.push({exId,sets:pl.sets,reps:pl.reps,w:ex.kbCount?defaultWeight(ex):0});
@@ -20,7 +22,7 @@ function kbNeeds(items){const need={};
  return Object.entries(need).map(([w,n])=>({w:+w,n})).sort((a,b)=>a.w-b.w);}
 function kbNeedHtml(items){const needs=kbNeeds(items),inv=D().inventory;
  return needs.length?`<div class="kb-need">${needs.map(x=>{const have=+inv[x.w]||0,miss=Math.max(0,x.n-have);return`<span class="${miss?'miss':''}">${x.n} × ${x.w} kg${miss?` <em>(${miss} fehlt)</em>`:''}</span>`;}).join('')}</div>`:'<p class="note">Keine Kettlebells nötig.</p>';}
-const GRIP='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+const ICON_UP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>',ICON_DOWN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 function renderWorkout(){const d=D().draft,v=$('#view-workout');d.items.forEach(normItem);
  const tpl=D().templates;
  const tplHtml=tpl.length?`<div class="card"><h3>Gespeicherte Workouts</h3>${tpl.map(t=>`<div class="prof"><b>${esc(t.name)}</b><span class="note">${t.items.length} Übungen</span><button class="icon-btn" data-load="${t.id}" aria-label="${esc(t.name)} laden">↺</button><button class="icon-btn" data-deltpl="${t.id}" aria-label="${esc(t.name)} löschen">✕</button></div>`).join('')}</div>`:'';
@@ -30,7 +32,7 @@ function renderWorkout(){const d=D().draft,v=$('#view-workout');d.items.forEach(
  <button class="btn" id="startW">${d.startedAt?'Übersicht anzeigen':'Workout starten'}</button>
  <div class="card"><h3>Benötigte Kettlebells</h3>${kbNeedHtml(d.items)}</div><div id="wItems">`;
  d.items.forEach((it,i)=>{const ex=byId[it.exId];if(!ex)return;const w=wOf(it);
-  html+=`<div class="card ex-card" data-i="${i}"><div class="ex-head"><button class="drag" type="button" aria-label="${esc(ex.name)} verschieben">${GRIP}</button>${ex.keys?`<button class="thumb-btn" data-open="${ex.id}" aria-label="${esc(ex.name)} ansehen"><canvas class="thumb" width="128" height="128" data-ex="${ex.id}"></canvas></button>`:''}<button class="name" data-open="${ex.id}">${esc(ex.name)}<small>${esc(lastInfo(ex.id))}</small></button>
+  html+=`<div class="card ex-card" data-i="${i}"><div class="ex-head"><div class="move"><button type="button" data-mv="${i}" data-dir="-1" aria-label="${esc(ex.name)} nach oben"${i===0?' disabled':''}>${ICON_UP}</button><button type="button" data-mv="${i}" data-dir="1" aria-label="${esc(ex.name)} nach unten"${i===d.items.length-1?' disabled':''}>${ICON_DOWN}</button></div>${ex.keys?`<button class="thumb-btn" data-open="${ex.id}" aria-label="${esc(ex.name)} ansehen"><canvas class="thumb" width="128" height="128" data-ex="${ex.id}"></canvas></button>`:''}<button class="name" data-open="${ex.id}">${esc(ex.name)}<small>${esc(lastInfo(ex.id))}</small></button>
   <button class="icon-btn" data-rm="${i}" aria-label="${esc(ex.name)} entfernen">✕</button></div>
   <div class="wrow"><span>Sätze</span><div class="stepper"><button type="button" data-k="sets" data-i="${i}" data-dir="-1" aria-label="Weniger Sätze">−</button><input type="number" inputmode="numeric" min="1" value="${it.sets}" data-f="sets" data-i="${i}" aria-label="Satzanzahl"><button type="button" data-k="sets" data-i="${i}" data-dir="1" aria-label="Mehr Sätze">+</button></div>
   <span class="x">×</span><div class="stepper"><button type="button" data-k="reps" data-i="${i}" data-dir="-1" aria-label="Weniger Wiederholungen">−</button><input type="number" inputmode="numeric" min="1" value="${it.reps}" data-f="reps" data-i="${i}" aria-label="Wiederholungen pro Satz"><button type="button" data-k="reps" data-i="${i}" data-dir="1" aria-label="Mehr Wiederholungen">+</button></div><span>Wdh.</span></div>${ex.kbCount?weightSelect(i,ex,w):''}</div>`;});
@@ -43,7 +45,7 @@ function renderWorkout(){const d=D().draft,v=$('#view-workout');d.items.forEach(
  v.querySelectorAll('[data-wsel]').forEach(el=>el.onchange=()=>{d.items[+el.dataset.wsel].w=+el.value;save();renderWorkout();});
  v.querySelectorAll('[data-rm]').forEach(el=>el.onclick=()=>{d.items.splice(+el.dataset.rm,1);save();render();});
  v.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openSheet(b.dataset.open));
- v.querySelectorAll('.drag').forEach(bindDrag);
+ v.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{const i=+b.dataset.mv,j=i+(+b.dataset.dir);if(j<0||j>=d.items.length)return;[d.items[i],d.items[j]]=[d.items[j],d.items[i]];save();renderWorkout();});
  observeThumbs();
  $('#startW').onclick=openStart;
  $('#finish').onclick=finishWorkout;
@@ -53,17 +55,6 @@ function renderWorkout(){const d=D().draft,v=$('#view-workout');d.items.forEach(
   d.name=name;save();toast('Workout gespeichert');renderWorkout();};
  $('#clear').onclick=()=>{if(!confirm('Workout leeren?'))return;d.items=[];d.name='';delete d.startedAt;save();render();};
  bindTpl();}
-// Reihenfolge per Ziehen am Griff ändern (Maus und Touch)
-function bindDrag(h){h.addEventListener('pointerdown',e=>{e.preventDefault();const card=h.closest('.ex-card'),box=$('#wItems');
- card.classList.add('dragging');h.setPointerCapture(e.pointerId);let raf=0,y=e.clientY;
- const scroll=()=>{if(y<90)scrollBy(0,-8);else if(y>innerHeight-130)scrollBy(0,8);raf=requestAnimationFrame(scroll);};raf=requestAnimationFrame(scroll);
- const move=ev=>{y=ev.clientY;const others=[...box.querySelectorAll('.ex-card:not(.dragging)')];
-  const after=others.find(c=>{const r=c.getBoundingClientRect();return y<r.top+r.height/2;});
-  if(after){if(card.nextElementSibling!==after)box.insertBefore(card,after);}else if(box.lastElementChild!==card)box.appendChild(card);};
- const up=()=>{cancelAnimationFrame(raf);h.removeEventListener('pointermove',move);h.removeEventListener('pointerup',up);h.removeEventListener('pointercancel',up);
-  const d=D().draft,old=d.items.slice(),order=[...box.querySelectorAll('.ex-card')].map(c=>+c.dataset.i);
-  d.items=order.map(i=>old[i]);save();renderWorkout();};
- h.addEventListener('pointermove',move);h.addEventListener('pointerup',up);h.addEventListener('pointercancel',up);});}
 function bindTpl(){const v=$('#view-workout'),d=D().draft;
  v.querySelectorAll('[data-load]').forEach(b=>b.onclick=()=>{const t=D().templates.find(x=>x.id===b.dataset.load);if(!t)return;
   if(d.items.length&&!confirm('Aktuelles Workout ersetzen?'))return;
