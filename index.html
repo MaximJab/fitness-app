@@ -30,6 +30,7 @@
   </section>
 
   <section id="view-workout" class="view" hidden></section>
+  <section id="view-saved" class="view" hidden></section>
   <section id="view-history" class="view" hidden></section>
   <section id="view-profile" class="view" hidden></section>
 </main>
@@ -37,6 +38,7 @@
 <nav class="tabbar" aria-label="Navigation">
   <button data-view="exercises" aria-current="page"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Übungen</button>
   <button data-view="workout"><span class="tiw"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="5"/><path d="M5.5 10.5a3 3 0 0 1 5 0"/><path d="M15 9h6M15 13h6M15 17h4"/></svg><b class="badge" id="wBadge" hidden></b></span>Workout</button>
+  <button data-view="saved"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16l-6-4-6 4z"/></svg>Gespeichert</button>
   <button data-view="history"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>Verlauf</button>
   <button data-view="profile"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Profil</button>
 </nav>
@@ -65,6 +67,7 @@
 <script src="js/core.js"></script>
 <script src="js/exercises-view.js"></script>
 <script src="js/workout.js"></script>
+<script src="js/saved.js"></script>
 <script src="js/history-profile.js"></script>
 <script src="js/detail.js"></script>
 <script src="js/main.js"></script>
