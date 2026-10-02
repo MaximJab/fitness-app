@@ -32,7 +32,7 @@ const fmtDate=iso=>new Date(iso).toLocaleDateString('de-DE',{weekday:'short',day
 
 // ---------- Navigation
 let view='exercises';
-const TITLES={exercises:'Übungen',workout:'Workout',saved:'Gespeichert',history:'Verlauf',profile:'Profil'};
+const TITLES={exercises:'Übungen',workout:'Workout',saved:'Gespeichert',history:'Verlauf',profile:'Profil',admin:'Verwaltung'};
 function go(v){view=v;document.querySelectorAll('.view').forEach(s=>s.hidden=s.id!=='view-'+v);
  document.querySelectorAll('.tabbar button').forEach(b=>b.toggleAttribute('aria-current',b.dataset.view===v));
  if(document.querySelector('.tabbar button[aria-current]'))document.querySelector('.tabbar button[aria-current]').setAttribute('aria-current','page');
@@ -45,7 +45,7 @@ function render(){
  document.querySelector('.tabbar').hidden=false;
  $('#profilePill').textContent=P().name;$('#profilePill').hidden=false;
  const n=D().draft.items.length;$('#wBadge').hidden=!n;$('#wBadge').textContent=n;
- ({exercises:renderExercises,workout:renderWorkout,saved:renderSaved,history:renderHistory,profile:renderProfile})[view]();}
+ ({exercises:renderExercises,workout:renderWorkout,saved:renderSaved,history:renderHistory,profile:renderProfile,admin:renderAdmin})[view]();}
 
 // ---------- Onboarding
 function renderOnboarding(){document.querySelector('.tabbar').hidden=true;$('#profilePill').hidden=true;

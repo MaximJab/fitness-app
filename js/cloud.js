@@ -4,7 +4,7 @@
 const FB_CONFIG={apiKey:'AIzaSyCl_-Q4HPoJddXBtgyCCvw5aPiwoDXqA0g',authDomain:'fitness-app-b7e07.firebaseapp.com',projectId:'fitness-app-b7e07',
  storageBucket:'fitness-app-b7e07.firebasestorage.app',messagingSenderId:'987023877077',appId:'1:987023877077:web:978b98b2fa2267082a135c'};
 const LOCAL_ONLY_KEY='fitapp.localOnly';
-let fbAuth=null,fbDb=null,CU=null,pushTimer=0,pushed={},syncState='';
+let fbAuth=null,fbDb=null,CU=null,pushTimer=0,pushed={},syncState='',IS_ADMIN=false;
 
 function cloudInit(){
  if(!window.firebase){render();return;}
@@ -14,6 +14,9 @@ function cloudInit(){
  fbAuth.onAuthStateChanged(async u=>{CU=u;
   if(!u){if(localStorage.getItem(LOCAL_ONLY_KEY)==='1')render();else renderLogin();return;}
   localStorage.removeItem(LOCAL_ONLY_KEY);
+  IS_ADMIN=false;
+  try{const [a,b]=await Promise.all([fbDb.collection('admins').doc(u.uid).get(),fbDb.collection('blocked').doc(u.uid).get()]);
+   IS_ADMIN=a.exists;if(b.exists){renderBlocked();return;}}catch(e){}
   try{await pullCloud(true);}catch(e){toast('Cloud nicht erreichbar, lokale Daten werden genutzt');}
   render();});
  document.addEventListener('visibilitychange',async()=>{if(document.hidden||!CU||pushTimer||S.dirty)return;
@@ -50,7 +53,10 @@ function localSave(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
 function cloudQueue(now){if(!CU||!fbDb)return;S.dirty=true;localSave();clearTimeout(pushTimer);pushTimer=setTimeout(pushCloud,now?0:800);setSync('pending');}
 async function pushCloud(){pushTimer=0;if(!CU)return;const uid=CU.uid;
  const data={};Object.entries(S.data).forEach(([pid,d])=>{const {sessions,...rest}=d;data[pid]=JSON.parse(JSON.stringify(rest));});
- const ops=[b=>b.set(userRef().collection('meta').doc('state'),{profiles:S.profiles,active:S.active,data,updated:firebase.firestore.FieldValue.serverTimestamp()})];
+ const nSess=Object.values(S.data).reduce((a,d)=>a+(d.sessions||[]).length,0);
+ const ops=[b=>b.set(userRef().collection('meta').doc('state'),{profiles:S.profiles,active:S.active,data,updated:firebase.firestore.FieldValue.serverTimestamp()}),
+  // Übersichtsdokument für die Verwaltung (E-Mail, Aktivität, Anzahl)
+  b=>b.set(userRef(),{email:CU.email||'',created:(CU.metadata&&CU.metadata.creationTime)||'',lastSeen:firebase.firestore.FieldValue.serverTimestamp(),profiles:S.profiles.length,sessions:nSess},{merge:true})];
  const now={};Object.entries(S.data).forEach(([pid,d])=>(d.sessions||[]).forEach(s=>{const h=pid+JSON.stringify(s);now[s.id]=h;
   if(pushed[s.id]!==h)ops.push(b=>b.set(userRef().collection('sessions').doc(s.id),{pid,...JSON.parse(JSON.stringify(s))}));}));
  Object.keys(pushed).forEach(id=>{if(!now[id])ops.push(b=>b.delete(userRef().collection('sessions').doc(id)));});
@@ -87,13 +93,19 @@ function authMsg(e){return({'auth/invalid-credential':'E-Mail oder Passwort ist 
  'auth/email-already-in-use':'Für diese E-Mail gibt es schon ein Konto. Bitte anmelden.','auth/weak-password':'Das Passwort braucht mindestens 6 Zeichen.',
  'auth/network-request-failed':'Keine Internetverbindung.','auth/too-many-requests':'Zu viele Versuche. Bitte später erneut probieren.'})[e&&e.code]||'Das hat nicht geklappt. Bitte erneut versuchen.';}
 
+// Gesperrter Zugang (vom Admin gelöscht)
+function renderBlocked(){document.querySelector('.tabbar').hidden=true;$('#profilePill').hidden=true;
+ document.querySelectorAll('.view').forEach(s=>s.hidden=s.id!=='view-profile');$('#title').textContent='';
+ $('#view-profile').innerHTML=`<div class="onboard"><h2>Zugang gesperrt</h2><p class="note">Dieses Konto wurde vom Administrator deaktiviert.</p><button class="btn sec" id="blOut">Abmelden</button></div>`;
+ $('#blOut').onclick=async()=>{await fbAuth.signOut();S={profiles:[],active:null,data:{}};localSave();};}
 // Karte „Konto“ im Profil
 function accountCardHtml(){if(!fbAuth)return'';
- return CU?`<div class="card"><h3>Konto</h3><p class="note">Angemeldet als <b>${esc(CU.email)}</b></p><p class="note" id="syncState">${syncText()}</p><button class="btn sec" id="acOut">Abmelden</button></div>`
+ return CU?`<div class="card"><h3>Konto</h3><p class="note">Angemeldet als <b>${esc(CU.email)}</b></p><p class="note" id="syncState">${syncText()}</p>${IS_ADMIN?'<button class="btn" id="acAdmin">Verwaltung öffnen</button>':''}<button class="btn sec" id="acOut">Abmelden</button></div>`
  :`<div class="card"><h3>Konto</h3><p class="note">Deine Daten liegen nur auf diesem Gerät.</p><button class="btn" id="acIn">Anmelden und in der Cloud speichern</button></div>`;}
-function bindAccountCard(){const o=$('#acOut'),i=$('#acIn');
+function bindAccountCard(){const o=$('#acOut'),i=$('#acIn'),ad=$('#acAdmin');
+ if(ad)ad.onclick=()=>go('admin');
  if(i)i.onclick=()=>{localStorage.removeItem(LOCAL_ONLY_KEY);renderLogin();};
  if(o)o.onclick=async()=>{if(!confirm('Abmelden? Deine Daten bleiben in der Cloud gespeichert und werden von diesem Gerät entfernt.'))return;
   if(pushTimer){clearTimeout(pushTimer);await pushCloud();}
   try{await Promise.race([fbDb.waitForPendingWrites(),new Promise(r=>setTimeout(r,4000))]);}catch(e){}
-  await fbAuth.signOut();S={profiles:[],active:null,data:{}};pushed={};localSave();view='exercises';};}
+  await fbAuth.signOut();IS_ADMIN=false;S={profiles:[],active:null,data:{}};pushed={};localSave();view='exercises';};}

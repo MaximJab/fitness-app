@@ -19,3 +19,5 @@
 .login .btn{margin-top:0}
 .login .link{text-align:left}
 .login-err{min-height:20px;margin:0;color:var(--warn);font-size:14px;font-weight:600}
+.adm-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;word-break:break-all}
+.adm-user dl{margin-bottom:8px}
