@@ -1,4 +1,4 @@
-// Grundlagen: Speicher, Hilfsfunktionen, Navigation, Onboarding
+// Grundlagen: Speicher, Hilfsfunktionen, Navigation
 // Teil der Fitness-App. Alle js/*.js-Dateien teilen sich den globalen Gültigkeitsbereich; Reihenfolge siehe index.html.
 const KEY='fitapp.v1';
 const KB_SIZES=[4,6,8,10,12,14,16,20,24,28,32];
@@ -41,16 +41,10 @@ document.querySelectorAll('.tabbar button').forEach(b=>b.onclick=()=>{if(!P())re
 $('#profilePill').onclick=()=>{if(P())go('profile');};
 
 function render(){
- if(!P()){renderOnboarding();return;}
- document.querySelector('.tabbar').hidden=false;
+ // Ohne Profil direkt eines anlegen (Name = Benutzername), damit man sofort in der App landet
+ if(!P()){if(S.profiles.length)S.active=S.profiles[0].id;else newProfile(typeof CU!=='undefined'&&CU&&typeof unameOf==='function'?unameOf(CU.email):'Ich');}
+ document.querySelector('.tabbar').hidden=false;$('#title').textContent=TITLES[view];
+ document.querySelectorAll('.view').forEach(x=>x.hidden=x.id!=='view-'+view);
  $('#profilePill').textContent=P().name;$('#profilePill').hidden=false;
  const n=D().draft.items.length;$('#wBadge').hidden=!n;$('#wBadge').textContent=n;
  ({exercises:renderExercises,workout:renderWorkout,saved:renderSaved,history:renderHistory,profile:renderProfile,admin:renderAdmin})[view]();}
-
-// ---------- Onboarding
-function renderOnboarding(){document.querySelector('.tabbar').hidden=true;$('#profilePill').hidden=true;
- document.querySelectorAll('.view').forEach(s=>s.hidden=s.id!=='view-profile');$('#title').textContent='';
- $('#view-profile').innerHTML=`<div class="onboard"><h2>Willkommen</h2><p class="note">Lege ein Profil an, um Workouts zu planen und dein Training zu dokumentieren.</p>
- <div class="inline"><input class="field" id="obName" placeholder="Dein Name" autocomplete="given-name"><button class="add" id="obGo" aria-label="Profil anlegen">→</button></div></div>`;
- const go1=()=>{const v=$('#obName').value.trim();if(!v){$('#obName').focus();return;}newProfile(v);go('exercises');};
- $('#obGo').onclick=go1;$('#obName').onkeydown=e=>{if(e.key==='Enter')go1();};}
