@@ -22,8 +22,11 @@ function cloudInit(){
   if(!u){if(localStorage.getItem(LOCAL_ONLY_KEY)==='1')render();else renderLogin('login');return;}
   localStorage.removeItem(LOCAL_ONLY_KEY);
   IS_ADMIN=false;
-  try{const [a,b]=await Promise.all([fbDb.collection('admins').doc(u.uid).get(),fbDb.collection('blocked').doc(u.uid).get()]);
-   IS_ADMIN=a.exists;if(b.exists){renderBlocked();return;}}catch(e){}
+  // Sperre zuerst prüfen (gesperrte Nutzer dürfen ihre übrigen Daten nicht mehr lesen)
+  try{const b=await fbDb.collection('blocked').doc(u.uid).get();
+   if(b.exists){if(b.data().deleted){await removeDeletedLogin(u);return;}renderBlocked();return;}}catch(e){}
+  try{const [a,ud]=await Promise.all([fbDb.collection('admins').doc(u.uid).get(),fbDb.collection('users').doc(u.uid).get()]);
+   IS_ADMIN=a.exists;if(ud.exists&&ud.data().mustChangePw){renderChangePw();return;}}catch(e){}
   try{await pullCloud(true);}catch(e){toast('Cloud nicht erreichbar, lokale Daten werden genutzt');}
   render();});
  document.addEventListener('visibilitychange',async()=>{if(document.hidden||!CU||pushTimer||S.dirty)return;
@@ -110,7 +113,27 @@ function authMsg(e){return({'auth/invalid-credential':'Benutzername oder Passwor
  'auth/email-already-in-use':'Dieser Benutzername ist schon vergeben.','pw-mismatch':'Die Passwörter stimmen nicht überein.','auth/weak-password':'Das Passwort braucht mindestens 6 Zeichen.',
  'auth/network-request-failed':'Keine Internetverbindung.','auth/too-many-requests':'Zu viele Versuche. Bitte später erneut probieren.'})[e&&e.code]||'Das hat nicht geklappt. Bitte erneut versuchen.';}
 
-// Gesperrter Zugang (vom Admin gelöscht)
+// Vom Admin gelöschtes Konto: Login beim Anmeldeversuch entfernen
+async function removeDeletedLogin(u){try{await fbDb.collection('blocked').doc(u.uid).delete();}catch(e){}
+ S={profiles:[],active:null,data:{}};localSave();
+ try{await u.delete();}catch(e){await fbAuth.signOut();}
+ toast('Dieses Konto wurde vom Administrator gelöscht');}
+// Passwort wurde vom Admin zurückgesetzt: eigenes Passwort festlegen
+function renderChangePw(){document.querySelector('.tabbar').hidden=true;$('#profilePill').hidden=true;
+ document.querySelectorAll('.view').forEach(s=>s.hidden=s.id!=='view-profile');$('#title').textContent='';
+ $('#view-profile').innerHTML=`<div class="onboard"><h2>Neues Passwort</h2><p class="note">Dein Passwort wurde vom Administrator zurückgesetzt. Lege jetzt ein eigenes Passwort fest.</p>
+ <div class="login"><input class="field" id="cpPw" type="password" autocomplete="new-password" placeholder="Neues Passwort (mind. 6 Zeichen)" aria-label="Neues Passwort">
+ <input class="field" id="cpPw2" type="password" autocomplete="new-password" placeholder="Passwort wiederholen" aria-label="Passwort wiederholen">
+ <p class="login-err" id="cpErr" role="alert"></p><button class="btn" id="cpGo">Passwort speichern</button><button class="btn sec" id="cpOut">Abmelden</button></div></div>`;
+ $('#cpOut').onclick=()=>fbAuth.signOut();
+ $('#cpGo').onclick=async()=>{const p1=$('#cpPw').value,p2=$('#cpPw2').value,err=m=>$('#cpErr').textContent=m;
+  if(p1.length<6)return err('Das Passwort braucht mindestens 6 Zeichen.');if(p1!==p2)return err('Die Passwörter stimmen nicht überein.');
+  if(p1===RESET_PW)return err('Bitte ein anderes Passwort als das vorläufige wählen.');
+  $('#cpGo').disabled=true;
+  try{await CU.updatePassword(p1);await userRef().set({mustChangePw:false},{merge:true});toast('Passwort geändert');
+   try{await pullCloud(true);}catch(e){}render();}
+  catch(e){$('#cpGo').disabled=false;err(e&&e.code==='auth/requires-recent-login'?'Bitte ab- und mit dem vorläufigen Passwort neu anmelden.':'Das hat nicht geklappt. Bitte erneut versuchen.');}};}
+// Gesperrter Zugang
 function renderBlocked(){document.querySelector('.tabbar').hidden=true;$('#profilePill').hidden=true;
  document.querySelectorAll('.view').forEach(s=>s.hidden=s.id!=='view-profile');$('#title').textContent='';
  $('#view-profile').innerHTML=`<div class="onboard"><h2>Zugang gesperrt</h2><p class="note">Dieses Konto wurde vom Administrator deaktiviert.</p><button class="btn sec" id="blOut">Abmelden</button></div>`;

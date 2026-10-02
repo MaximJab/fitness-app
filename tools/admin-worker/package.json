@@ -1,0 +1,8 @@
+{
+  "name": "fitness-app-admin-worker",
+  "private": true,
+  "description": "Erledigt Admin-Aufträge (Passwort-Reset, Login löschen) mit dem Firebase Admin SDK",
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}
