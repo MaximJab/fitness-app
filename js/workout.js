@@ -64,17 +64,18 @@ function saveTemplate(items,cur){const name=(cur||'').trim()||prompt('Name für 
 function openStart(){const d=D().draft;d.items.forEach(normItem);save();
  $('#startBody').innerHTML=`<h2 class="start-title">${esc(d.name||'Dein Workout')}</h2><p class="note">${d.items.length} Übungen in dieser Reihenfolge</p>
  <ol class="start-list">${d.items.map((it,i)=>{const ex=byId[it.exId];if(!ex)return'';const hw=D().weights[it.exId];
-  return`<li><span class="start-n">${i+1}</span>${ex.keys?`<canvas class="start-img" width="160" height="160" data-ex="${ex.id}"></canvas>`:'<span class="start-img"></span>'}
+  return`<li><span class="start-n">${i+1}</span>${ex.keys?`<canvas class="start-img thumb" width="160" height="160" data-ex="${ex.id}"></canvas>`:'<span class="start-img"></span>'}
   <div><b>${esc(ex.name)}</b><small>${it.sets} Sätze × ${it.reps} Wdh.</small>
   ${ex.kbCount?`<span class="wt">${wOf(it)} kg${ex.kbCount===2?' × 2':''}</span>${hw==null?'<small>noch kein Training gespeichert</small>':''}`:''}</div></li>`;}).join('')}</ol>
  <div class="card"><h3>Benötigte Kettlebells</h3>${kbNeedHtml(d.items)}</div>
  <button class="btn" id="startGo">Training beginnen</button><button class="btn sec" id="startBack">Zurück</button>`;
  $('#startSheet').hidden=false;document.body.style.overflow='hidden';
- if(initThumbs())document.querySelectorAll('#startBody canvas.start-img').forEach(c=>drawStill(c,byId[c.dataset.ex]));
+ // Erstes Bild sofort zeichnen, danach animiert der gemeinsame Mini-Renderer die Bilder
+ if(initThumbs()){document.querySelectorAll('#startBody canvas.start-img').forEach(c=>drawStill(c,byId[c.dataset.ex]));observeThumbs();}
  $('#startGo').onclick=()=>{D().active={name:d.name,startedAt:new Date().toISOString(),items:d.items.map(it=>({...it,act:{w:wOf(it),sets:it.sets,reps:it.reps}}))};
   d.items=[];d.name='';save();closeStart();window.scrollTo(0,0);render();};
  $('#startBack').onclick=closeStart;$('#startClose').onclick=closeStart;}
-function closeStart(){$('#startSheet').hidden=true;document.body.style.overflow='';}
+function closeStart(){$('#startSheet').hidden=true;document.body.style.overflow='';observeThumbs();}
 // Trainingsmodus: pro Übung die tatsächlichen Werte erfassen (vorbelegt mit der Planung)
 function renderTraining(){const A=D().active,v=$('#view-workout');A.items.forEach(normItem);
  A.items.forEach(it=>{if(!it.act)it.act={w:wOf(it),sets:it.sets,reps:it.reps};});
