@@ -11,7 +11,8 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY));}catch(e){S=null;}
 if(!S||!S.profiles)S={profiles:[],active:null,data:{}};
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Speichern fehlgeschlagen');}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Speichern fehlgeschlagen');}
+ if(typeof cloudQueue==='function')cloudQueue();}
 const P=()=>S.profiles.find(p=>p.id===S.active);
 const D=()=>S.data[S.active];
 function newProfile(name){const id=uid();S.profiles.push({id,name,created:new Date().toISOString()});

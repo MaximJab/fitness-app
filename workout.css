@@ -15,3 +15,7 @@
 .saved-list li{padding:3px 0}
 .saved-list small{color:var(--muted);margin-left:6px}
 .tabbar button{font-size:10.5px}
+.login{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.login .btn{margin-top:0}
+.login .link{text-align:left}
+.login-err{min-height:20px;margin:0;color:var(--warn);font-size:14px;font-weight:600}
