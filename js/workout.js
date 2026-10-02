@@ -33,8 +33,10 @@ function kbNeeds(items){const need={};
 function kbNeedHtml(items){const needs=kbNeeds(items),inv=D().inventory;
  return needs.length?`<div class="kb-need">${needs.map(x=>{const have=+inv[x.w]||0,miss=Math.max(0,x.n-have);return`<span class="${miss?'miss':''}">${x.n} × ${x.w} kg${miss?` <em>(${miss} fehlt)</em>`:''}</span>`;}).join('')}</div>`:'<p class="note">Keine Kettlebells nötig.</p>';}
 const ICON_UP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>',ICON_DOWN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
-function renderWorkout(){const d=D().draft,v=$('#view-workout');d.items.forEach(normItem);
- if(d.training&&d.items.length){renderTraining();return;}
+// Laufendes Training liegt getrennt von der Auswahl (D().active), damit die Auswahl danach wieder frei ist
+function migrateTraining(){const d=D().draft;if(d.training){if(d.items.length)D().active={name:d.name,startedAt:d.startedAt,items:d.items};d.items=[];d.name='';delete d.training;delete d.startedAt;}}
+function renderWorkout(){migrateTraining();const d=D().draft,v=$('#view-workout');d.items.forEach(normItem);
+ if(D().active){renderTraining();return;}
  if(!d.items.length){v.innerHTML=`<p class="empty">Noch keine Übungen im Workout.<br>Tippe in der Übungsliste auf <b>+</b> oder lade ein gespeichertes Workout.</p><button class="btn" id="toEx">Übungen ansehen</button><button class="btn sec" id="toSaved">Gespeicherte Workouts</button>`;
   $('#toEx').onclick=()=>go('exercises');$('#toSaved').onclick=()=>go('saved');return;}
  let html=`<input class="field" id="wName" placeholder="Name des Workouts (optional)" value="${esc(d.name)}">
@@ -52,12 +54,12 @@ function renderWorkout(){const d=D().draft,v=$('#view-workout');d.items.forEach(
  v.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{const i=+b.dataset.mv,j=i+(+b.dataset.dir);if(j<0||j>=d.items.length)return;[d.items[i],d.items[j]]=[d.items[j],d.items[i]];save();renderWorkout();});
  observeThumbs();
  $('#startW').onclick=openStart;
- $('#saveTpl').onclick=()=>saveTemplate(d.items.map(it=>({exId:it.exId,sets:it.sets,reps:it.reps,w:wOf(it)})));
+ $('#saveTpl').onclick=()=>{if(saveTemplate(d.items.map(it=>({exId:it.exId,sets:it.sets,reps:it.reps,w:wOf(it)})),d.name)){d.items=[];d.name='';save();render();}};
  $('#clear').onclick=()=>{if(!confirm('Workout leeren?'))return;d.items=[];d.name='';delete d.training;delete d.startedAt;save();render();};}
 // Workout unter einem Namen im Reiter „Gespeichert“ ablegen
-function saveTemplate(items){const d=D().draft,name=(d.name||'').trim()||prompt('Name für das Workout:','Mein Workout');if(!name)return;
- const ex=D().templates.find(t=>t.name===name);if(ex){if(!confirm(`„${name}“ überschreiben?`))return;ex.items=items;}else D().templates.push({id:uid(),name,items});
- d.name=name;save();toast(`„${name}“ gespeichert`);}
+function saveTemplate(items,cur){const name=(cur||'').trim()||prompt('Name für das Workout:','Mein Workout');if(!name)return null;
+ const ex=D().templates.find(t=>t.name===name);if(ex){if(!confirm(`„${name}“ überschreiben?`))return null;ex.items=items;}else D().templates.push({id:uid(),name,items});
+ save();toast(`„${name}“ gespeichert`);return name;}
 // Übersicht beim Start: Bilder, Reihenfolge, Gewichte
 function openStart(){const d=D().draft;d.items.forEach(normItem);save();
  $('#startBody').innerHTML=`<h2 class="start-title">${esc(d.name||'Dein Workout')}</h2><p class="note">${d.items.length} Übungen in dieser Reihenfolge</p>
@@ -69,27 +71,29 @@ function openStart(){const d=D().draft;d.items.forEach(normItem);save();
  <button class="btn" id="startGo">Training beginnen</button><button class="btn sec" id="startBack">Zurück</button>`;
  $('#startSheet').hidden=false;document.body.style.overflow='hidden';
  if(initThumbs())document.querySelectorAll('#startBody canvas.start-img').forEach(c=>drawStill(c,byId[c.dataset.ex]));
- $('#startGo').onclick=()=>{d.items.forEach(it=>it.act={w:wOf(it),sets:it.sets,reps:it.reps});d.training=true;d.startedAt=new Date().toISOString();save();closeStart();window.scrollTo(0,0);renderWorkout();};
+ $('#startGo').onclick=()=>{D().active={name:d.name,startedAt:new Date().toISOString(),items:d.items.map(it=>({...it,act:{w:wOf(it),sets:it.sets,reps:it.reps}}))};
+  d.items=[];d.name='';save();closeStart();window.scrollTo(0,0);render();};
  $('#startBack').onclick=closeStart;$('#startClose').onclick=closeStart;}
 function closeStart(){$('#startSheet').hidden=true;document.body.style.overflow='';}
 // Trainingsmodus: pro Übung die tatsächlichen Werte erfassen (vorbelegt mit der Planung)
-function renderTraining(){const d=D().draft,v=$('#view-workout');
- d.items.forEach(it=>{if(!it.act)it.act={w:wOf(it),sets:it.sets,reps:it.reps};});
- const since=new Date(d.startedAt||Date.now()).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
- v.innerHTML=`<div class="train-head"><b>${esc(d.name||'Training')}</b><span>läuft seit ${since} Uhr</span></div>
- ${d.items.map((it,i)=>{const ex=byId[it.exId];if(!ex)return'';
+function renderTraining(){const A=D().active,v=$('#view-workout');A.items.forEach(normItem);
+ A.items.forEach(it=>{if(!it.act)it.act={w:wOf(it),sets:it.sets,reps:it.reps};});
+ const since=new Date(A.startedAt||Date.now()).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+ v.innerHTML=`<div class="train-head"><b>${esc(A.name||'Training')}</b><span>läuft seit ${since} Uhr</span></div>
+ ${A.items.map((it,i)=>{const ex=byId[it.exId];if(!ex)return'';
   return`<div class="card ex-card train-card"><div class="ex-head"><span class="start-n">${i+1}</span>${thumbHtml(ex)}<button class="name" data-open="${ex.id}">${esc(ex.name)}<small>Geplant: ${it.sets} × ${it.reps}${ex.kbCount?`, ${wOf(it)} kg`:''}</small></button></div>
   ${setsRepsRow(i,it.act,'act')}${ex.kbCount?weightSelect(i,ex,+it.act.w,'act'):''}</div>`;}).join('')}
  <button class="btn" id="trEnd">Workout beenden</button><div class="btn-row"><button class="btn sec" id="trSave">Workout speichern</button><button class="btn sec" id="trBack">Zurück</button></div>`;
- bindInputs(v,d,renderTraining);observeThumbs();
- $('#trBack').onclick=()=>{delete d.training;delete d.startedAt;save();window.scrollTo(0,0);renderWorkout();};
- $('#trSave').onclick=()=>saveTemplate(d.items.map(it=>({exId:it.exId,sets:it.act.sets,reps:it.act.reps,w:+it.act.w})));
+ bindInputs(v,A,renderTraining);observeThumbs();
+ // Zurück: Übungen wandern zurück in die Workout-Zusammenstellung
+ $('#trBack').onclick=()=>{const d=D().draft;A.items.forEach(it=>{delete it.act;if(!d.items.some(x=>x.exId===it.exId))d.items.push(it);});
+  if(!d.name)d.name=A.name||'';delete D().active;save();window.scrollTo(0,0);render();};
+ $('#trSave').onclick=()=>{const n=saveTemplate(A.items.map(it=>({exId:it.exId,sets:it.act.sets,reps:it.act.reps,w:+it.act.w})),A.name);if(n){A.name=n;save();renderTraining();}};
  $('#trEnd').onclick=finishWorkout;}
-function finishWorkout(){const d=D().draft;
- const entries=d.items.filter(it=>byId[it.exId]).map(it=>{const a=it.act||{w:wOf(it),sets:it.sets,reps:it.reps},w=byId[it.exId].kbCount?+a.w:0;return{exId:it.exId,sets:Array.from({length:a.sets},()=>({w,r:a.reps}))};});
+function finishWorkout(){const A=D().active;if(!A)return;
+ const entries=A.items.filter(it=>byId[it.exId]).map(it=>{const a=it.act||{w:wOf(it),sets:it.sets,reps:it.reps},w=byId[it.exId].kbCount?+a.w:0;return{exId:it.exId,sets:Array.from({length:a.sets},()=>({w,r:a.reps}))};});
  if(!entries.length){toast('Keine Übungen im Workout');return;}
  if(!confirm('Workout beenden und im Verlauf speichern?'))return;
- D().sessions.push({id:uid(),date:new Date().toISOString(),start:d.startedAt||null,name:d.name||'Training',entries});
+ D().sessions.push({id:uid(),date:new Date().toISOString(),start:A.startedAt||null,name:A.name||'Training',entries});
  entries.forEach(e=>{if(byId[e.exId].kbCount)D().weights[e.exId]=e.sets[0].w;});
- d.items.forEach(it=>{if(it.act){it.sets=it.act.sets;it.reps=it.act.reps;it.w=it.act.w;delete it.act;}});
- delete d.training;delete d.startedAt;save();toast('Workout im Verlauf gespeichert');go('history');}
+ delete D().active;save();toast('Workout im Verlauf gespeichert');go('history');}
