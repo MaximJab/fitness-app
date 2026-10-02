@@ -40,7 +40,7 @@ $('#sheetClose').onclick=closeSheet;
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet();});
 addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#sheet').hidden)closeSheet();else if(!$('#startSheet').hidden)closeStart();});
 
-// ---------- Mini-Animationen in Übungsliste und Workout (ein gemeinsamer Renderer, nur sichtbare Zeilen)
+// ---------- Mini-Animationen in Übungsliste, Workout und Start-Übersicht (ein gemeinsamer Renderer, nur sichtbare Zeilen)
 let TH=null;
 function initThumbs(){if(TH||!window.THREE)return TH;
  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(1);renderer.setSize(128,128,false);
@@ -51,13 +51,15 @@ function initThumbs(){if(TH||!window.THREE)return TH;
  const io=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting?vis.add(e.target):vis.delete(e.target)),{rootMargin:'100px'});
  TH={renderer,scene,camera,E:KBEngine(THREE,scene),vis,io,last:0,still:matchMedia('(prefers-reduced-motion: reduce)').matches};
  requestAnimationFrame(thumbLoop);return TH;}
-function observeThumbs(){if(!initThumbs())return;TH.io.disconnect();TH.vis.clear();document.querySelectorAll('main canvas.thumb').forEach(c=>{c._drawn=false;TH.io.observe(c);});}
+function observeThumbs(){if(!initThumbs())return;TH.io.disconnect();TH.vis.clear();document.querySelectorAll('main canvas.thumb, #startBody canvas.thumb').forEach(c=>{c._drawn=false;TH.io.observe(c);});}
 function drawStill(c,ex){if(!ex||!ex.keys)return;const cm=Object.assign({x:0,y:.92,R:3.9,h:1.2,az:.45},ex.cam||{});
  TH.E.setProps(ex);TH.E.apply(ex,.4);TH.camera.position.set(cm.x+cm.R*.95*Math.sin(cm.az),cm.h,cm.R*.95*Math.cos(cm.az));TH.camera.lookAt(cm.x,cm.y,0);
  TH.renderer.render(TH.scene,TH.camera);const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(TH.renderer.domElement,0,0,c.width,c.height);}
 function thumbLoop(now){requestAnimationFrame(thumbLoop);
- if(now-TH.last<50||(view!=='exercises'&&view!=='workout')||!$('#sheet').hidden||!$('#startSheet').hidden)return;TH.last=now;
- TH.vis.forEach(c=>{const ex=byId[c.dataset.ex];if(!ex||!ex.keys||(TH.still&&c._drawn))return;
+ // Bei offener Start-Übersicht nur deren Bilder animieren, sonst die der Liste bzw. des Workouts
+ const inStart=!$('#startSheet').hidden;
+ if(now-TH.last<50||!$('#sheet').hidden||(!inStart&&view!=='exercises'&&view!=='workout'))return;TH.last=now;
+ TH.vis.forEach(c=>{const ex=byId[c.dataset.ex];if(!ex||!ex.keys||(TH.still&&c._drawn)||inStart!==!!c.closest('#startBody'))return;
   const t=TH.still?.35:(now/1000/ex.period)%1,cm=Object.assign({x:0,y:.92,R:3.9,h:1.2,az:.45},ex.cam||{});
   TH.E.setProps(ex);TH.E.apply(ex,t);
   TH.camera.position.set(cm.x+cm.R*.95*Math.sin(cm.az),cm.h,cm.R*.95*Math.cos(cm.az));TH.camera.lookAt(cm.x,cm.y,0);
