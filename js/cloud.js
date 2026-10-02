@@ -4,6 +4,11 @@
 const FB_CONFIG={apiKey:'AIzaSyCl_-Q4HPoJddXBtgyCCvw5aPiwoDXqA0g',authDomain:'fitness-app-b7e07.firebaseapp.com',projectId:'fitness-app-b7e07',
  storageBucket:'fitness-app-b7e07.firebasestorage.app',messagingSenderId:'987023877077',appId:'1:987023877077:web:978b98b2fa2267082a135c'};
 const LOCAL_ONLY_KEY='fitapp.localOnly';
+// Anmeldung per Benutzername: intern als E-Mail-Adresse dieser Domain (es werden keine E-Mails verschickt)
+const USER_DOMAIN='user.fitness-app-b7e07.firebaseapp.com';
+const UNAME_RE=/^[a-z0-9._-]{3,20}$/;
+const unameOf=e=>String(e||'').replace(/@.*$/,'');
+const unameToMail=u=>u+'@'+USER_DOMAIN;
 let fbAuth=null,fbDb=null,CU=null,pushTimer=0,pushed={},syncState='',IS_ADMIN=false;
 
 function cloudInit(){
@@ -56,7 +61,7 @@ async function pushCloud(){pushTimer=0;if(!CU)return;const uid=CU.uid;
  const nSess=Object.values(S.data).reduce((a,d)=>a+(d.sessions||[]).length,0);
  const ops=[b=>b.set(userRef().collection('meta').doc('state'),{profiles:S.profiles,active:S.active,data,updated:firebase.firestore.FieldValue.serverTimestamp()}),
   // Übersichtsdokument für die Verwaltung (E-Mail, Aktivität, Anzahl)
-  b=>b.set(userRef(),{email:CU.email||'',created:(CU.metadata&&CU.metadata.creationTime)||'',lastSeen:firebase.firestore.FieldValue.serverTimestamp(),profiles:S.profiles.length,sessions:nSess},{merge:true})];
+  b=>b.set(userRef(),{email:CU.email||'',username:unameOf(CU.email),created:(CU.metadata&&CU.metadata.creationTime)||'',lastSeen:firebase.firestore.FieldValue.serverTimestamp(),profiles:S.profiles.length,sessions:nSess},{merge:true})];
  const now={};Object.entries(S.data).forEach(([pid,d])=>(d.sessions||[]).forEach(s=>{const h=pid+JSON.stringify(s);now[s.id]=h;
   if(pushed[s.id]!==h)ops.push(b=>b.set(userRef().collection('sessions').doc(s.id),{pid,...JSON.parse(JSON.stringify(s))}));}));
  Object.keys(pushed).forEach(id=>{if(!now[id])ops.push(b=>b.delete(userRef().collection('sessions').doc(id)));});
@@ -75,22 +80,23 @@ function renderLoading(){document.querySelector('.tabbar').hidden=true;$('#profi
 function renderLogin(){document.querySelector('.tabbar').hidden=true;$('#profilePill').hidden=true;
  document.querySelectorAll('.view').forEach(s=>s.hidden=s.id!=='view-profile');$('#title').textContent='';
  $('#view-profile').innerHTML=`<div class="onboard"><h2>Anmelden</h2><p class="note">Mit einem Konto werden deine Trainings in der Cloud gespeichert und sind auf iPhone und Computer gleich.</p>
- <div class="login"><input class="field" id="lgMail" type="email" autocomplete="email" placeholder="E-Mail-Adresse" aria-label="E-Mail-Adresse">
+ <div class="login"><input class="field" id="lgUser" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Benutzername" aria-label="Benutzername">
  <input class="field" id="lgPw" type="password" autocomplete="current-password" placeholder="Passwort (mind. 6 Zeichen)" aria-label="Passwort">
  <p class="login-err" id="lgErr" role="alert"></p>
  <button class="btn" id="lgIn">Anmelden</button><button class="btn sec" id="lgNew">Neues Konto erstellen</button>
- <button class="link" id="lgReset">Passwort vergessen?</button><button class="link" id="lgLocal">Ohne Konto nutzen (nur auf diesem Gerät)</button></div></div>`;
- const mail=()=>$('#lgMail').value.trim(),pw=()=>$('#lgPw').value,err=m=>{$('#lgErr').textContent=m;};
+ <p class="note">Benutzername: 3 bis 20 Zeichen, nur Buchstaben, Zahlen, Punkt, Binde- und Unterstrich. Merke dir dein Passwort gut, es lässt sich nicht per E-Mail zurücksetzen.</p>
+ <button class="link" id="lgLocal">Ohne Konto nutzen (nur auf diesem Gerät)</button></div></div>`;
+ const uname=()=>$('#lgUser').value.trim().toLowerCase(),pw=()=>$('#lgPw').value,err=m=>{$('#lgErr').textContent=m;};
+ const mail=()=>{const u=uname();if(!u)throw{code:'auth/missing-email'};if(!UNAME_RE.test(u))throw{code:'auth/invalid-email'};return unameToMail(u);};
  const run=async f=>{err('');document.querySelectorAll('.login button').forEach(b=>b.disabled=true);
   try{await f();}catch(e){err(authMsg(e));}document.querySelectorAll('.login button').forEach(b=>b.disabled=false);};
  $('#lgIn').onclick=()=>run(()=>fbAuth.signInWithEmailAndPassword(mail(),pw()));
  $('#lgPw').onkeydown=e=>{if(e.key==='Enter')$('#lgIn').click();};
  $('#lgNew').onclick=()=>run(()=>fbAuth.createUserWithEmailAndPassword(mail(),pw()));
- $('#lgReset').onclick=()=>run(async()=>{if(!mail())throw{code:'auth/missing-email'};await fbAuth.sendPasswordResetEmail(mail());err('Wir haben dir eine E-Mail zum Zurücksetzen geschickt.');});
  $('#lgLocal').onclick=()=>{localStorage.setItem(LOCAL_ONLY_KEY,'1');render();};}
-function authMsg(e){return({'auth/invalid-credential':'E-Mail oder Passwort ist falsch.','auth/wrong-password':'E-Mail oder Passwort ist falsch.','auth/user-not-found':'E-Mail oder Passwort ist falsch.',
- 'auth/invalid-email':'Bitte eine gültige E-Mail-Adresse eingeben.','auth/missing-email':'Bitte zuerst die E-Mail-Adresse eingeben.','auth/missing-password':'Bitte ein Passwort eingeben.',
- 'auth/email-already-in-use':'Für diese E-Mail gibt es schon ein Konto. Bitte anmelden.','auth/weak-password':'Das Passwort braucht mindestens 6 Zeichen.',
+function authMsg(e){return({'auth/invalid-credential':'Benutzername oder Passwort ist falsch.','auth/wrong-password':'Benutzername oder Passwort ist falsch.','auth/user-not-found':'Benutzername oder Passwort ist falsch.',
+ 'auth/invalid-email':'Der Benutzername darf nur Buchstaben, Zahlen, Punkt, Binde- und Unterstrich enthalten (3 bis 20 Zeichen).','auth/missing-email':'Bitte einen Benutzernamen eingeben.','auth/missing-password':'Bitte ein Passwort eingeben.',
+ 'auth/email-already-in-use':'Dieser Benutzername ist schon vergeben.','auth/weak-password':'Das Passwort braucht mindestens 6 Zeichen.',
  'auth/network-request-failed':'Keine Internetverbindung.','auth/too-many-requests':'Zu viele Versuche. Bitte später erneut probieren.'})[e&&e.code]||'Das hat nicht geklappt. Bitte erneut versuchen.';}
 
 // Gesperrter Zugang (vom Admin gelöscht)
@@ -100,7 +106,7 @@ function renderBlocked(){document.querySelector('.tabbar').hidden=true;$('#profi
  $('#blOut').onclick=async()=>{await fbAuth.signOut();S={profiles:[],active:null,data:{}};localSave();};}
 // Karte „Konto“ im Profil
 function accountCardHtml(){if(!fbAuth)return'';
- return CU?`<div class="card"><h3>Konto</h3><p class="note">Angemeldet als <b>${esc(CU.email)}</b></p><p class="note" id="syncState">${syncText()}</p>${IS_ADMIN?'<button class="btn" id="acAdmin">Verwaltung öffnen</button>':''}<button class="btn sec" id="acOut">Abmelden</button></div>`
+ return CU?`<div class="card"><h3>Konto</h3><p class="note">Angemeldet als <b>${esc(unameOf(CU.email))}</b></p><p class="note" id="syncState">${syncText()}</p>${IS_ADMIN?'<button class="btn" id="acAdmin">Verwaltung öffnen</button>':''}<button class="btn sec" id="acOut">Abmelden</button></div>`
  :`<div class="card"><h3>Konto</h3><p class="note">Deine Daten liegen nur auf diesem Gerät.</p><button class="btn" id="acIn">Anmelden und in der Cloud speichern</button></div>`;}
 function bindAccountCard(){const o=$('#acOut'),i=$('#acIn'),ad=$('#acAdmin');
  if(ad)ad.onclick=()=>go('admin');
