@@ -9,7 +9,9 @@ const USER_DOMAIN='user.fitness-app-b7e07.firebaseapp.com';
 const UNAME_RE=/^[a-z0-9._-]{3,20}$/;
 const unameOf=e=>String(e||'').replace(/@.*$/,'');
 const unameToMail=u=>u+'@'+USER_DOMAIN;
-let fbAuth=null,fbDb=null,CU=null,pushTimer=0,pushed={},syncState='',IS_ADMIN=false;
+let fbAuth=null,fbDb=null,CU=null,pushTimer=0,pushed={},syncState='',IS_ADMIN=false,pendingName='';
+// Anzeigename mit Groß-/Kleinschreibung wie bei der Registrierung eingegeben
+const uDisplay=()=>(CU&&(CU.displayName||(pendingName&&pendingName.toLowerCase()===unameOf(CU.email)?pendingName:'')))||unameOf(CU&&CU.email);
 
 function cloudInit(){
  if(!window.firebase){render();return;}
@@ -17,7 +19,7 @@ function cloudInit(){
   fbDb.enablePersistence({synchronizeTabs:true}).catch(()=>{});}catch(e){render();return;}
  renderLoading();
  fbAuth.onAuthStateChanged(async u=>{CU=u;
-  if(!u){if(localStorage.getItem(LOCAL_ONLY_KEY)==='1')render();else renderLogin();return;}
+  if(!u){if(localStorage.getItem(LOCAL_ONLY_KEY)==='1')render();else renderLogin('login');return;}
   localStorage.removeItem(LOCAL_ONLY_KEY);
   IS_ADMIN=false;
   try{const [a,b]=await Promise.all([fbDb.collection('admins').doc(u.uid).get(),fbDb.collection('blocked').doc(u.uid).get()]);
@@ -61,7 +63,7 @@ async function pushCloud(){pushTimer=0;if(!CU)return;const uid=CU.uid;
  const nSess=Object.values(S.data).reduce((a,d)=>a+(d.sessions||[]).length,0);
  const ops=[b=>b.set(userRef().collection('meta').doc('state'),{profiles:S.profiles,active:S.active,data,updated:firebase.firestore.FieldValue.serverTimestamp()}),
   // Übersichtsdokument für die Verwaltung (E-Mail, Aktivität, Anzahl)
-  b=>b.set(userRef(),{email:CU.email||'',username:unameOf(CU.email),created:(CU.metadata&&CU.metadata.creationTime)||'',lastSeen:firebase.firestore.FieldValue.serverTimestamp(),profiles:S.profiles.length,sessions:nSess},{merge:true})];
+  b=>b.set(userRef(),{email:CU.email||'',username:uDisplay(),created:(CU.metadata&&CU.metadata.creationTime)||'',lastSeen:firebase.firestore.FieldValue.serverTimestamp(),profiles:S.profiles.length,sessions:nSess},{merge:true})];
  const now={};Object.entries(S.data).forEach(([pid,d])=>(d.sessions||[]).forEach(s=>{const h=pid+JSON.stringify(s);now[s.id]=h;
   if(pushed[s.id]!==h)ops.push(b=>b.set(userRef().collection('sessions').doc(s.id),{pid,...JSON.parse(JSON.stringify(s))}));}));
  Object.keys(pushed).forEach(id=>{if(!now[id])ops.push(b=>b.delete(userRef().collection('sessions').doc(id)));});
@@ -77,26 +79,35 @@ addEventListener('online',()=>{if(CU&&S.dirty)cloudQueue(true);});
 function renderLoading(){document.querySelector('.tabbar').hidden=true;$('#profilePill').hidden=true;
  document.querySelectorAll('.view').forEach(s=>s.hidden=s.id!=='view-profile');$('#title').textContent='';
  $('#view-profile').innerHTML='<p class="empty">Wird geladen …</p>';}
-function renderLogin(){document.querySelector('.tabbar').hidden=true;$('#profilePill').hidden=true;
+function renderLogin(mode,preUser){const signup=mode==='signup';
+ document.querySelector('.tabbar').hidden=true;$('#profilePill').hidden=true;
  document.querySelectorAll('.view').forEach(s=>s.hidden=s.id!=='view-profile');$('#title').textContent='';
- $('#view-profile').innerHTML=`<div class="onboard"><h2>Anmelden</h2><p class="note">Mit einem Konto werden deine Trainings in der Cloud gespeichert und sind auf iPhone und Computer gleich.</p>
- <div class="login"><input class="field" id="lgUser" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Benutzername" aria-label="Benutzername">
- <input class="field" id="lgPw" type="password" autocomplete="current-password" placeholder="Passwort (mind. 6 Zeichen)" aria-label="Passwort">
+ $('#view-profile').innerHTML=`<div class="onboard"><h2>${signup?'Neues Konto':'Anmelden'}</h2><p class="note">Mit einem Konto werden deine Trainings in der Cloud gespeichert und sind auf iPhone und Computer gleich.</p>
+ <div class="login"><input class="field" id="lgUser" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Benutzername" aria-label="Benutzername" value="${esc(preUser||'')}">
+ <input class="field" id="lgPw" type="password" autocomplete="${signup?'new-password':'current-password'}" placeholder="Passwort (mind. 6 Zeichen)" aria-label="Passwort">
+ ${signup?'<input class="field" id="lgPw2" type="password" autocomplete="new-password" placeholder="Passwort wiederholen" aria-label="Passwort wiederholen">':''}
  <p class="login-err" id="lgErr" role="alert"></p>
- <button class="btn" id="lgIn">Anmelden</button><button class="btn sec" id="lgNew">Neues Konto erstellen</button>
+ ${signup?'<button class="btn" id="lgNew">Konto erstellen</button><button class="btn sec" id="lgMode">Ich habe schon ein Konto</button>'
+  :'<button class="btn" id="lgIn">Anmelden</button><button class="btn sec" id="lgMode">Neues Konto erstellen</button>'}
  <p class="note">Benutzername: 3 bis 20 Zeichen, nur Buchstaben, Zahlen, Punkt, Binde- und Unterstrich. Merke dir dein Passwort gut, es lässt sich nicht per E-Mail zurücksetzen.</p>
  <button class="link" id="lgLocal">Ohne Konto nutzen (nur auf diesem Gerät)</button></div></div>`;
- const uname=()=>$('#lgUser').value.trim().toLowerCase(),pw=()=>$('#lgPw').value,err=m=>{$('#lgErr').textContent=m;};
- const mail=()=>{const u=uname();if(!u)throw{code:'auth/missing-email'};if(!UNAME_RE.test(u))throw{code:'auth/invalid-email'};return unameToMail(u);};
+ const raw=()=>$('#lgUser').value.trim(),pw=()=>$('#lgPw').value,err=m=>{$('#lgErr').textContent=m;};
+ const mail=()=>{const u=raw().toLowerCase();if(!u)throw{code:'auth/missing-email'};if(!UNAME_RE.test(u))throw{code:'auth/invalid-email'};return unameToMail(u);};
  const run=async f=>{err('');document.querySelectorAll('.login button').forEach(b=>b.disabled=true);
   try{await f();}catch(e){err(authMsg(e));}document.querySelectorAll('.login button').forEach(b=>b.disabled=false);};
- $('#lgIn').onclick=()=>run(()=>fbAuth.signInWithEmailAndPassword(mail(),pw()));
- $('#lgPw').onkeydown=e=>{if(e.key==='Enter')$('#lgIn').click();};
- $('#lgNew').onclick=()=>run(()=>fbAuth.createUserWithEmailAndPassword(mail(),pw()));
- $('#lgLocal').onclick=()=>{localStorage.setItem(LOCAL_ONLY_KEY,'1');render();};}
+ $('#lgMode').onclick=()=>renderLogin(signup?'login':'signup',raw());
+ $('#lgLocal').onclick=()=>{localStorage.setItem(LOCAL_ONLY_KEY,'1');render();};
+ if(signup){
+  $('#lgNew').onclick=()=>run(async()=>{const m=mail();if(pw().length<6)throw{code:'auth/weak-password'};if(pw()!==$('#lgPw2').value)throw{code:'pw-mismatch'};
+   pendingName=raw();const r=await fbAuth.createUserWithEmailAndPassword(m,pw());
+   try{await (r&&r.user?r.user:fbAuth.currentUser).updateProfile({displayName:pendingName});}catch(e){}});
+  $('#lgPw2').onkeydown=e=>{if(e.key==='Enter')$('#lgNew').click();};}
+ else{
+  $('#lgIn').onclick=()=>run(()=>fbAuth.signInWithEmailAndPassword(mail(),pw()));
+  $('#lgPw').onkeydown=e=>{if(e.key==='Enter')$('#lgIn').click();};}}
 function authMsg(e){return({'auth/invalid-credential':'Benutzername oder Passwort ist falsch.','auth/wrong-password':'Benutzername oder Passwort ist falsch.','auth/user-not-found':'Benutzername oder Passwort ist falsch.',
  'auth/invalid-email':'Der Benutzername darf nur Buchstaben, Zahlen, Punkt, Binde- und Unterstrich enthalten (3 bis 20 Zeichen).','auth/missing-email':'Bitte einen Benutzernamen eingeben.','auth/missing-password':'Bitte ein Passwort eingeben.',
- 'auth/email-already-in-use':'Dieser Benutzername ist schon vergeben.','auth/weak-password':'Das Passwort braucht mindestens 6 Zeichen.',
+ 'auth/email-already-in-use':'Dieser Benutzername ist schon vergeben.','pw-mismatch':'Die Passwörter stimmen nicht überein.','auth/weak-password':'Das Passwort braucht mindestens 6 Zeichen.',
  'auth/network-request-failed':'Keine Internetverbindung.','auth/too-many-requests':'Zu viele Versuche. Bitte später erneut probieren.'})[e&&e.code]||'Das hat nicht geklappt. Bitte erneut versuchen.';}
 
 // Gesperrter Zugang (vom Admin gelöscht)
@@ -106,18 +117,18 @@ function renderBlocked(){document.querySelector('.tabbar').hidden=true;$('#profi
  $('#blOut').onclick=async()=>{await fbAuth.signOut();S={profiles:[],active:null,data:{}};localSave();};}
 // Karte „Konto“ im Profil
 function accountCardHtml(){if(!fbAuth)return'';
- return CU?`<div class="card"><h3>Konto</h3><p class="note">Angemeldet als <b>${esc(unameOf(CU.email))}</b></p><p class="note" id="syncState">${syncText()}</p>${IS_ADMIN?'<button class="btn" id="acAdmin">Verwaltung öffnen</button>':''}<button class="btn sec" id="acOut">Abmelden</button></div>`
+ return CU?`<div class="card"><h3>Konto</h3><p class="note">Angemeldet als <b>${esc(uDisplay())}</b></p><p class="note" id="syncState">${syncText()}</p>${IS_ADMIN?'<button class="btn" id="acAdmin">Verwaltung öffnen</button>':''}<button class="btn sec" id="acOut">Abmelden</button></div>`
  :`<div class="card"><h3>Konto</h3><p class="note">Deine Daten liegen nur auf diesem Gerät.</p><button class="btn" id="acIn">Anmelden und in der Cloud speichern</button></div>`;}
 function bindAccountCard(){const o=$('#acOut'),i=$('#acIn'),ad=$('#acAdmin');
  if(ad)ad.onclick=()=>go('admin');
- if(i)i.onclick=()=>{localStorage.removeItem(LOCAL_ONLY_KEY);renderLogin();};
+ if(i)i.onclick=()=>{localStorage.removeItem(LOCAL_ONLY_KEY);renderLogin('login');};
  if(o)o.onclick=async()=>{if(!confirm('Abmelden? Deine Daten bleiben in der Cloud gespeichert und werden von diesem Gerät entfernt.'))return;
   if(pushTimer){clearTimeout(pushTimer);await pushCloud();}
   try{await Promise.race([fbDb.waitForPendingWrites(),new Promise(r=>setTimeout(r,4000))]);}catch(e){}
   await fbAuth.signOut();IS_ADMIN=false;S={profiles:[],active:null,data:{}};pushed={};localSave();view='exercises';};}
 // Eigenes Konto löschen: erst alle Daten in Firestore, dann das Login. Danach erscheint die Anmeldeseite.
 async function deleteAccount(){if(!CU)return;
- if(!confirm(`Konto „${unameOf(CU.email)}“ endgültig löschen?\n\nAlle Profile, Trainings und gespeicherten Workouts werden gelöscht. Das lässt sich nicht rückgängig machen.`))return;
+ if(!confirm(`Konto „${uDisplay()}“ endgültig löschen?\n\nAlle Profile, Trainings und gespeicherten Workouts werden gelöscht. Das lässt sich nicht rückgängig machen.`))return;
  clearTimeout(pushTimer);pushTimer=0;
  const delAuth=async()=>{try{await CU.delete();}catch(e){
    if(e&&e.code==='auth/requires-recent-login'){const pw=prompt('Zur Sicherheit bitte dein Passwort eingeben:');if(!pw)throw{code:'cancel'};

@@ -42,9 +42,9 @@ $('#profilePill').onclick=()=>{if(P())go('profile');};
 
 function render(){
  // Ohne Profil direkt eines anlegen (Name = Benutzername), damit man sofort in der App landet
- if(!P()){if(S.profiles.length)S.active=S.profiles[0].id;else newProfile(typeof CU!=='undefined'&&CU&&typeof unameOf==='function'?unameOf(CU.email):'Ich');}
+ if(!P()){if(S.profiles.length)S.active=S.profiles[0].id;else newProfile(typeof CU!=='undefined'&&CU&&typeof uDisplay==='function'?uDisplay():'Ich');}
  document.querySelector('.tabbar').hidden=false;$('#title').textContent=TITLES[view];
  document.querySelectorAll('.view').forEach(x=>x.hidden=x.id!=='view-'+view);
- $('#profilePill').textContent=P().name;$('#profilePill').hidden=false;
+ $('#profilePill').textContent=typeof CU!=='undefined'&&CU&&typeof uDisplay==='function'?uDisplay():P().name;$('#profilePill').hidden=false;
  const n=D().draft.items.length;$('#wBadge').hidden=!n;$('#wBadge').textContent=n;
  ({exercises:renderExercises,workout:renderWorkout,saved:renderSaved,history:renderHistory,profile:renderProfile,admin:renderAdmin})[view]();}
