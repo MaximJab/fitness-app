@@ -21,7 +21,8 @@ function renderProfile(){const v=$('#view-profile'),inv=D().inventory;
  ${typeof accountCardHtml==='function'?accountCardHtml():''}
  <div class="card"><h3>Datensicherung</h3><p class="note">${typeof CU!=='undefined'&&CU?'Deine Daten liegen in der Cloud. Zusätzlich kannst du sie als Datei sichern.':'Ohne Konto liegen die Daten nur auf diesem Gerät. Sichere sie regelmäßig als Datei.'}</p>
   <div class="btn-row"><button class="btn sec" id="exp">Exportieren</button><button class="btn sec" id="impBtn">Importieren</button></div><input type="file" id="imp" accept="application/json,.json" hidden></div>
- <button class="btn danger" id="delProf">Profil „${esc(P().name)}“ löschen</button>`;
+ ${S.profiles.length>1?`<button class="btn danger" id="delProf">Profil „${esc(P().name)}“ löschen</button>`:''}
+ ${typeof CU!=='undefined'&&CU?'<button class="btn danger" id="delAcc">Konto löschen</button>':''}`;
  v.querySelectorAll('[data-sw]').forEach(b=>b.onclick=()=>{S.active=b.dataset.sw;save();fWeight='Alle';render();toast('Profil gewechselt');});
  $('#npAdd').onclick=()=>{const n=$('#npName').value.trim();if(!n)return;newProfile(n);fWeight='Alle';render();toast('Profil angelegt');};
  $('#rnGo').onclick=()=>{const n=$('#rnName').value.trim();if(!n)return;P().name=n;save();render();};
@@ -33,4 +34,5 @@ function renderProfile(){const v=$('#view-profile'),inv=D().inventory;
  $('#imp').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const x=JSON.parse(await f.text());if(!x.profiles||!x.data)throw 0;
   if(!confirm('Alle aktuellen Daten durch die Sicherung ersetzen?'))return;S=x;if(!P())S.active=S.profiles[0]?.id||null;save();render();toast('Sicherung geladen');}catch(err){toast('Datei ist keine gültige Sicherung');}};
  if(typeof bindAccountCard==='function')bindAccountCard();
- $('#delProf').onclick=()=>{if(!confirm(`Profil „${P().name}“ mit allen Trainings löschen?`))return;delete S.data[S.active];S.profiles=S.profiles.filter(p=>p.id!==S.active);S.active=S.profiles[0]?.id||null;save();view='exercises';render();};}
+ if($('#delAcc'))$('#delAcc').onclick=()=>deleteAccount();
+ if($('#delProf'))$('#delProf').onclick=()=>{if(!confirm(`Profil „${P().name}“ mit allen Trainings löschen?`))return;delete S.data[S.active];S.profiles=S.profiles.filter(p=>p.id!==S.active);S.active=S.profiles[0]?.id||null;save();view='exercises';render();};}

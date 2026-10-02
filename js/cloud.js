@@ -115,3 +115,16 @@ function bindAccountCard(){const o=$('#acOut'),i=$('#acIn'),ad=$('#acAdmin');
   if(pushTimer){clearTimeout(pushTimer);await pushCloud();}
   try{await Promise.race([fbDb.waitForPendingWrites(),new Promise(r=>setTimeout(r,4000))]);}catch(e){}
   await fbAuth.signOut();IS_ADMIN=false;S={profiles:[],active:null,data:{}};pushed={};localSave();view='exercises';};}
+// Eigenes Konto löschen: erst alle Daten in Firestore, dann das Login. Danach erscheint die Anmeldeseite.
+async function deleteAccount(){if(!CU)return;
+ if(!confirm(`Konto „${unameOf(CU.email)}“ endgültig löschen?\n\nAlle Profile, Trainings und gespeicherten Workouts werden gelöscht. Das lässt sich nicht rückgängig machen.`))return;
+ clearTimeout(pushTimer);pushTimer=0;
+ const delAuth=async()=>{try{await CU.delete();}catch(e){
+   if(e&&e.code==='auth/requires-recent-login'){const pw=prompt('Zur Sicherheit bitte dein Passwort eingeben:');if(!pw)throw{code:'cancel'};
+    await CU.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(CU.email,pw));await CU.delete();}
+   else throw e;}};
+ try{const ref=userRef(),ss=await ref.collection('sessions').get(),docs=[ref.collection('meta').doc('state'),ref];ss.forEach(d=>docs.push(d.ref));
+  for(let i=0;i<docs.length;i+=400){const b=fbDb.batch();docs.slice(i,i+400).forEach(r=>b.delete(r));await b.commit();}
+  pushed={};S={profiles:[],active:null,data:{}};localSave();view='exercises';
+  await delAuth();IS_ADMIN=false;toast('Konto gelöscht');}
+ catch(e){if(e&&e.code==='cancel')return;toast(e&&e.code==='auth/invalid-credential'?'Passwort falsch, Konto nicht gelöscht':'Löschen fehlgeschlagen');}}
