@@ -30,8 +30,8 @@ function bindInputs(v,d,rerender){const tgt=(i,sc)=>sc==='act'?d.items[i].act:d.
 function kbNeeds(items){const need={};
  items.forEach(it=>{const ex=byId[it.exId],w=wOf(it);if(!ex||!ex.kbCount||!(w>0))return;need[w]=Math.max(need[w]||0,ex.kbCount);});
  return Object.entries(need).map(([w,n])=>({w:+w,n})).sort((a,b)=>a.w-b.w);}
-function kbNeedHtml(items){const needs=kbNeeds(items),inv=D().inventory;
- return needs.length?`<div class="kb-need">${needs.map(x=>{const have=+inv[x.w]||0,miss=Math.max(0,x.n-have);return`<span class="${miss?'miss':''}">${x.n} × ${x.w} kg${miss?` <em>(${miss} fehlt)</em>`:''}</span>`;}).join('')}</div>`:'<p class="note">Keine Kettlebells nötig.</p>';}
+function kbNeedHtml(items){const needs=kbNeeds(items);
+ return needs.length?`<div class="kb-need">${needs.map(x=>`<span>${x.n} × ${x.w} kg</span>`).join('')}</div>`:'<p class="note">Keine Kettlebells nötig.</p>';}
 const ICON_UP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>',ICON_DOWN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 // Laufendes Training liegt getrennt von der Auswahl (D().active), damit die Auswahl danach wieder frei ist
 function migrateTraining(){const d=D().draft;if(d.training){if(d.items.length)D().active={name:d.name,startedAt:d.startedAt,items:d.items};d.items=[];d.name='';delete d.training;delete d.startedAt;}}
