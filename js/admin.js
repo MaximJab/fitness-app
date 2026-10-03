@@ -1,7 +1,7 @@
 // Verwaltung (nur für Admins): Nutzer sperren, entsperren, löschen, Passwort zurücksetzen
 // Teil der Fitness-App. Alle js/*.js-Dateien teilen sich den globalen Gültigkeitsbereich; Reihenfolge siehe index.html.
 // Admin ist, wer ein Dokument admins/{uid} hat. Dieses wird nur in der Firebase-Konsole angelegt (Regeln verbieten das Schreiben aus der App).
-// Passwort-Resets erledigt der GitHub-Action-Worker (tools/admin-worker), weil das nur mit Admin-Rechten auf dem Server geht.
+// Passwort-Resets erledigt der GitHub-Action-Worker (tools/admin-worker, wöchentlich oder per „Run workflow“), weil das nur mit Admin-Rechten auf dem Server geht.
 const FB_USERS_URL='https://console.firebase.google.com/project/fitness-app-b7e07/authentication/users';
 const RESET_PW='Training123';
 const tsText=t=>{if(!t)return'–';const d=t.toDate?t.toDate():new Date(t);return isNaN(d)?'–':d.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});};
@@ -23,8 +23,8 @@ async function renderAdmin(){const v=$('#view-admin');
    <button class="btn sec" data-reset="${u.id}" data-name="${esc(nm(u))}"${rs?' disabled':''}>Passwort zurücksetzen</button>
    <button class="btn danger" data-del="${u.id}" data-name="${esc(nm(u))}">Löschen inkl. aller Daten</button></div>`}</div>`;}).join('')}
  ${deleted.length?`<div class="card"><h3>Gelöschte Konten</h3>${deleted.map(b=>`<div class="prof"><b>${esc(nm(b))}</b><span class="note">${tsText(b.at)}</span></div>`).join('')}
-  <p class="note">Die Daten sind gelöscht. Das Login wird automatisch entfernt, sobald der Nutzer sich noch einmal anmelden will oder der Admin-Worker läuft. Sofort geht es in der <a href="${FB_USERS_URL}" target="_blank" rel="noopener">Firebase-Konsole</a>.</p></div>`:''}
- <p class="note">Passwort-Resets setzt der Admin-Worker auf „${RESET_PW}“, er läuft etwa alle 5 Minuten. Beim nächsten Anmelden muss der Nutzer ein eigenes Passwort festlegen.</p>`;
+  <p class="note">Die Daten sind gelöscht. Das Login wird automatisch entfernt, sobald der Nutzer sich noch einmal anmelden will oder der Admin-Worker läuft (wöchentlich). Sofort geht es in der <a href="${FB_USERS_URL}" target="_blank" rel="noopener">Firebase-Konsole</a>.</p></div>`:''}
+ <p class="note">Passwort-Resets und das endgültige Entfernen gelöschter Logins erledigt der Admin-Worker einmal pro Woche (montags). Sofort geht es über „Run workflow“ in <a href="https://github.com/MaximJab/fitness-app/actions/workflows/admin-worker.yml" target="_blank" rel="noopener">GitHub Actions</a>. Das Passwort wird auf „${RESET_PW}“ gesetzt, beim nächsten Anmelden legt der Nutzer ein eigenes fest.</p>`;
  v.querySelectorAll('[data-block]').forEach(b=>b.onclick=()=>adminAct(async()=>{if(!confirm(`${b.dataset.name} sperren? Die Daten bleiben erhalten.`))return false;
   await fbDb.collection('blocked').doc(b.dataset.block).set({username:b.dataset.name,deleted:false,at:firebase.firestore.FieldValue.serverTimestamp()});return'Nutzer gesperrt';}));
  v.querySelectorAll('[data-unblock]').forEach(b=>b.onclick=()=>adminAct(async()=>{if(!confirm('Sperre aufheben?'))return false;

@@ -1,5 +1,5 @@
 // Admin-Worker: erledigt Aufträge aus der Verwaltung, die nur mit Server-Rechten möglich sind.
-// Läuft als GitHub Action (.github/workflows/admin-worker.yml) etwa alle 5 Minuten.
+// Läuft als GitHub Action (.github/workflows/admin-worker.yml) einmal pro Woche oder per „Run workflow“.
 // Benötigt das Repository-Secret FIREBASE_SERVICE_ACCOUNT (JSON-Schlüssel eines Firebase-Dienstkontos).
 const admin = require('firebase-admin');
 const RESET_PW = 'Training123';
