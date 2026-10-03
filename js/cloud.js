@@ -140,10 +140,23 @@ function renderBlocked(){document.querySelector('.tabbar').hidden=true;$('#profi
  $('#blOut').onclick=async()=>{await fbAuth.signOut();S={profiles:[],active:null,data:{}};localSave();};}
 // Karte „Konto“ im Profil
 function accountCardHtml(){if(!fbAuth)return'';
- return CU?`<div class="card"><h3>Konto</h3><p class="note">Angemeldet als <b>${esc(uDisplay())}</b></p><p class="note" id="syncState">${syncText()}</p>${IS_ADMIN?'<button class="btn" id="acAdmin">Verwaltung öffnen</button>':''}<button class="btn sec" id="acOut">Abmelden</button></div>`
+ return CU?`<div class="card"><h3>Konto</h3><p class="note">Angemeldet als <b>${esc(uDisplay())}</b></p><p class="note" id="syncState">${syncText()}</p>${IS_ADMIN?'<button class="btn" id="acAdmin">Verwaltung öffnen</button>':''}<button class="btn sec" id="acOut">Abmelden</button></div>
+ <div class="card"><h3>Passwort ändern</h3><div class="login"><input class="field" id="pwNew" type="password" autocomplete="new-password" placeholder="Neues Passwort (mind. 6 Zeichen)" aria-label="Neues Passwort">
+ <input class="field" id="pwNew2" type="password" autocomplete="new-password" placeholder="Neues Passwort wiederholen" aria-label="Neues Passwort wiederholen">
+ <p class="login-err" id="pwErr" role="alert"></p><button class="btn sec" id="pwGo">Passwort ändern</button></div></div>`
  :`<div class="card"><h3>Konto</h3><p class="note">Deine Daten liegen nur auf diesem Gerät.</p><button class="btn" id="acIn">Anmelden und in der Cloud speichern</button></div>`;}
 function bindAccountCard(){const o=$('#acOut'),i=$('#acIn'),ad=$('#acAdmin');
  if(ad)ad.onclick=()=>go('admin');
+ const pg=$('#pwGo');if(pg)pg.onclick=async()=>{const p1=$('#pwNew').value,p2=$('#pwNew2').value,err=m=>$('#pwErr').textContent=m;err('');
+  if(p1.length<6)return err('Das Passwort braucht mindestens 6 Zeichen.');if(p1!==p2)return err('Die Passwörter stimmen nicht überein.');
+  pg.disabled=true;
+  try{try{await CU.updatePassword(p1);}catch(e){
+    // Firebase verlangt bei länger zurückliegender Anmeldung das bisherige Passwort
+    if(!(e&&e.code==='auth/requires-recent-login'))throw e;const old=prompt('Zur Sicherheit bitte dein bisheriges Passwort eingeben:');if(!old)throw{code:'cancel'};
+    await CU.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(CU.email,old));await CU.updatePassword(p1);}
+   $('#pwNew').value='';$('#pwNew2').value='';toast('Passwort geändert');}
+  catch(e){if(!(e&&e.code==='cancel'))err(e&&(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password')?'Bisheriges Passwort ist falsch.':e&&e.code==='auth/weak-password'?'Das Passwort braucht mindestens 6 Zeichen.':'Das hat nicht geklappt. Bitte erneut versuchen.');}
+  pg.disabled=false;};
  if(i)i.onclick=()=>{localStorage.removeItem(LOCAL_ONLY_KEY);renderLogin('login');};
  if(o)o.onclick=async()=>{if(!confirm('Abmelden? Deine Daten bleiben in der Cloud gespeichert und werden von diesem Gerät entfernt.'))return;
   if(pushTimer){clearTimeout(pushTimer);await pushCloud();}
