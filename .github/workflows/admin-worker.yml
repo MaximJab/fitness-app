@@ -2,7 +2,8 @@ name: Admin-Worker
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    # einmal pro Woche: montags 03:00 UTC
+    - cron: '0 3 * * 1'
   workflow_dispatch:
 
 jobs:
