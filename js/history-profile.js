@@ -3,10 +3,11 @@
 // ---------- Verlauf
 function renderHistory(){const ss=[...D().sessions].reverse(),v=$('#view-history');
  if(!ss.length){v.innerHTML='<p class="empty">Noch kein Training gespeichert.</p>';return;}
+ const vol=s=>s.entries.reduce((a,e)=>a+e.sets.reduce((b,x)=>b+(x.w||0)*x.r*(byId[e.exId]?.kbCount||1),0),0);
  // Pro Übung: Gewicht, Anzahl Sätze und Wiederholungen
  const exLine=e=>{const ex=byId[e.exId],rs=[...new Set(e.sets.map(x=>x.r))],w=e.sets[0]?.w;
   return`${ex&&ex.kbCount&&w?`${w} kg${ex.kbCount===2?' × 2':''}, `:''}${e.sets.length} ${e.sets.length===1?'Satz':'Sätze'} × ${rs.join('/')} Wdh.`;};
- v.innerHTML=ss.map(s=>`<details class="card hist-item"><summary><h3>${esc(s.name)}</h3><div class="meta">${fmtDate(s.date)}, ${s.entries.length} Übungen</div></summary>
+ v.innerHTML=ss.map(s=>`<details class="card hist-item"><summary><h3>${esc(s.name)}</h3><div class="meta">${fmtDate(s.date)}, ${s.entries.length} Übungen${vol(s)?`, ${Math.round(vol(s)).toLocaleString('de-DE')} kg bewegt`:''}</div></summary>
   ${s.entries.map(e=>`<div class="hist-ex"><b>${esc(byId[e.exId]?.name||e.exId)}</b>${exLine(e)}</div>`).join('')}
   <div class="btn-row"><button class="btn" data-repeat="${s.id}">Training wiederholen</button><button class="btn danger" data-delsess="${s.id}">Löschen</button></div></details>`).join('');
  v.querySelectorAll('[data-delsess]').forEach(b=>b.onclick=()=>{if(!confirm('Dieses Training löschen?'))return;D().sessions=D().sessions.filter(x=>x.id!==b.dataset.delsess);save();renderHistory();});

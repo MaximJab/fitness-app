@@ -32,6 +32,10 @@ function kbNeeds(items){const need={};
  return Object.entries(need).map(([w,n])=>({w:+w,n})).sort((a,b)=>a.w-b.w);}
 function kbNeedHtml(items){const needs=kbNeeds(items);
  return needs.length?`<div class="kb-need">${needs.map(x=>`<span>${x.n} × ${x.w} kg</span>`).join('')}</div>`:'<p class="note">Keine Kettlebells nötig.</p>';}
+// Bewegte Last: Gewicht × Sätze × Wiederholungen × Anzahl Glocken
+function planVolume(items){return items.reduce((a,it)=>{const ex=byId[it.exId];return a+(ex&&ex.kbCount?wOf(it)*it.sets*it.reps*ex.kbCount:0);},0);}
+function kbCardHtml(items){const v=planVolume(items);
+ return`<div class="card"><div class="kb-row"><h3>Benötigte Kettlebells</h3>${v?`<span class="vol">${Math.round(v).toLocaleString('de-DE')} kg bewegt</span>`:''}</div>${kbNeedHtml(items)}</div>`;}
 const ICON_UP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>',ICON_DOWN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 // Laufendes Training liegt getrennt von der Auswahl (D().active), damit die Auswahl danach wieder frei ist
 function migrateTraining(){const d=D().draft;if(d.training){if(d.items.length)D().active={name:d.name,startedAt:d.startedAt,items:d.items};d.items=[];d.name='';delete d.training;delete d.startedAt;}}
@@ -41,7 +45,7 @@ function renderWorkout(){migrateTraining();const d=D().draft,v=$('#view-workout'
   $('#toEx').onclick=()=>go('exercises');$('#toSaved').onclick=()=>go('saved');return;}
  let html=`<input class="field" id="wName" placeholder="Name des Workouts (optional)" value="${esc(d.name)}">
  <button class="btn" id="startW">Workout starten</button>
- <div class="card"><h3>Benötigte Kettlebells</h3>${kbNeedHtml(d.items)}</div><div id="wItems">`;
+ ${kbCardHtml(d.items)}<div id="wItems">`;
  d.items.forEach((it,i)=>{const ex=byId[it.exId];if(!ex)return;
   html+=`<div class="card ex-card" data-i="${i}"><div class="ex-head"><div class="move"><button type="button" data-mv="${i}" data-dir="-1" aria-label="${esc(ex.name)} nach oben"${i===0?' disabled':''}>${ICON_UP}</button><button type="button" data-mv="${i}" data-dir="1" aria-label="${esc(ex.name)} nach unten"${i===d.items.length-1?' disabled':''}>${ICON_DOWN}</button></div>${thumbHtml(ex)}<button class="name" data-open="${ex.id}">${esc(ex.name)}<small>${esc(lastInfo(ex.id))}</small></button>
   <button class="icon-btn" data-rm="${i}" aria-label="${esc(ex.name)} entfernen">✕</button></div>
@@ -67,7 +71,7 @@ function openStart(){const d=D().draft;d.items.forEach(normItem);save();
   return`<li><span class="start-n">${i+1}</span>${ex.keys?`<canvas class="start-img thumb" width="160" height="160" data-ex="${ex.id}"></canvas>`:'<span class="start-img"></span>'}
   <div><b>${esc(ex.name)}</b><small>${it.sets} Sätze × ${it.reps} Wdh.</small>
   ${ex.kbCount?`<span class="wt">${wOf(it)} kg${ex.kbCount===2?' × 2':''}</span>${hw==null?'<small>noch kein Training gespeichert</small>':''}`:''}</div></li>`;}).join('')}</ol>
- <div class="card"><h3>Benötigte Kettlebells</h3>${kbNeedHtml(d.items)}</div>
+ ${kbCardHtml(d.items)}
  <button class="btn" id="startGo">Training beginnen</button><button class="btn sec" id="startBack">Zurück</button>`;
  $('#startSheet').hidden=false;document.body.style.overflow='hidden';
  // Erstes Bild sofort zeichnen, danach animiert der gemeinsame Mini-Renderer die Bilder

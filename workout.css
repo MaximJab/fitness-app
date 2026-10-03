@@ -25,3 +25,5 @@
 .tag.warn{background:var(--accent-soft);color:var(--warn)}
 .adm-actions{display:flex;flex-wrap:wrap;gap:8px}
 .adm-actions .btn{flex:1 1 140px;margin-top:0;padding:10px}
+.kb-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.kb-row .vol{font-weight:700;font-size:14px;color:var(--accent-ink);white-space:nowrap}
