@@ -45,6 +45,7 @@ let curP=null;function kbPose(mode,out){if(mode==='floor'){out.pos.set(curP.kbx,
   if(mode==='two')dir.copy(a1).sub(b1).add(a2).sub(b2).normalize();else dir.copy(DOWN);}
  else if(mode==='oneHang'){out.pos.copy(a1);dir.copy(a1).sub(b1).normalize();}
  else if(mode==='oneDown'){out.pos.copy(a1);dir.copy(DOWN);}
+ else if(mode==='bottom'){A.fa.getWorldPosition(e1);out.pos.copy(a1);dir.copy(a1).sub(e1).normalize();}
  else if(mode==='hip'){const f=V().set(1,0,0).applyQuaternion(T.quaternion);out.pos.copy(T.position).addScaledVector(f,.33);dir.copy(f).negate();}
  else{A.fa.getWorldPosition(e1);out.pos.copy(a1);dir.copy(e1).sub(a1).normalize();out.bp.set(0,-.1,.08*A.side);}
  out.q.setFromUnitVectors(DOWN,dir);return out;}
@@ -52,7 +53,7 @@ const kA={pos:V(),q:new THREE.Quaternion(),bp:V()},kB={pos:V(),q:new THREE.Quate
 const propMat=new THREE.MeshStandardMaterial({color:0x8a7560,roughness:.85});const props=new THREE.Group();scene.add(props);
 const propCache=new Map();
 function setProps(ex){props.children.forEach(c=>c.visible=false);if(!ex.props)return;let g=propCache.get(ex);
- if(!g){g=new THREE.Group();ex.props.forEach(b=>{const m=new THREE.Mesh(new THREE.BoxGeometry(b.w,b.h,b.d),propMat);m.position.set(b.x,b.h/2,b.z||0);g.add(m);});props.add(g);propCache.set(ex,g);}
+ if(!g){g=new THREE.Group();ex.props.forEach(b=>{const m=new THREE.Mesh(new THREE.BoxGeometry(b.w,b.h,b.d),propMat);m.position.set(b.x,(b.y||0)+b.h/2,b.z||0);g.add(m);});props.add(g);propCache.set(ex,g);}
  g.visible=true;}
 function placeKB(K,mode,mode2,w){kbPose(mode,kA);if(mode2&&w>0){kbPose(mode2,kB);kA.pos.lerp(kB.pos,w);kA.q.slerp(kB.q,w);kA.bp.lerp(kB.bp,w);}
  K.g.position.copy(kA.pos);K.g.quaternion.copy(kA.q);K.b.position.copy(kA.bp);}
@@ -64,9 +65,9 @@ function applyPose(ex,p){curP=p;const rel=ex.rel||{},lm=ex.legs||{};
   const dx=f.fx-p.hx,dy=f.fy-p.hy,dz=f.fz-hz,Lp=Math.hypot(dy,dz),al=Math.atan2(-dz,-dy),dist=Math.hypot(dx,Lp),c=Math.acos(Math.min(1,dist/(2*LEG))),b=Math.atan2(dx,Lp);
   l.th.rotation.set(al,0,b+c);l.sh.rotation.z=-2*c;l.ft.rotation.z=f.fa*D-(b-c);});
  scene.updateMatrixWorld(true);
- placeKB(K1,ex.kb,ex.kb2,p.kbw);
+ // kb:'none' für Übungen ohne Kettlebell (Körpergewicht)
+ K1.g.visible=ex.kb!=='none';if(ex.kb!=='none')placeKB(K1,ex.kb,ex.kb2,p.kbw);
  K2.g.visible=!!ex.kbL;if(ex.kbL)placeKB(K2,ex.kbL,ex.kbL2,p.kbwL||0);
  scene.updateMatrixWorld(true);}
 function apply(ex,t){const r=poseAt(ex,t);applyPose(ex,r.p);return r.txt;}
 return{apply,applyPose,poseAt,prep,arms,kb,bell,bodyMeshes,T,legs,K2,setProps,props};}
-
