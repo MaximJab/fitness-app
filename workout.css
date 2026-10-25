@@ -27,3 +27,31 @@
 .adm-actions .btn{flex:1 1 140px;margin-top:0;padding:10px}
 .kb-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .kb-row .vol{font-weight:700;font-size:14px;color:var(--accent-ink);white-space:nowrap}
+.step-no{margin:0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-ink)}
+.setup .wrow{margin-top:6px}
+.toggle{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.toggle input{width:26px;height:26px;margin:2px 0 0;accent-color:var(--accent);flex:0 0 auto}
+.toggle small{display:block;color:var(--muted);font-size:14px}
+.reps-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.reps-pills span{display:flex;flex-direction:column;align-items:center;min-width:48px;padding:5px 8px;border-radius:10px;background:var(--bg);font-weight:700;font-size:18px;font-variant-numeric:tabular-nums;line-height:1.1}
+.reps-pills small{font-size:11px;font-weight:600;color:var(--muted)}
+.ov-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 4px}
+.ov-stats div{background:var(--bg);border-radius:12px;padding:10px 6px;text-align:center;min-width:0}
+.ov-stats b{display:block;font-family:var(--display);font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+.ov-stats span{font-size:11px;color:var(--muted);font-weight:600}
+.ov-list li{align-items:flex-start}
+.ov-body{min-width:0;flex:1}
+.ov-body .wt{margin:4px 0 0}
+.set-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.set-row{display:flex;align-items:center;gap:6px;padding:6px;border-radius:12px;background:var(--bg);flex-wrap:wrap}
+.set-row.done{background:var(--ok-soft)}
+.set-no{font-weight:700;font-size:13px;min-width:44px}
+.set-row .stepper{background:var(--surface)}
+.set-row .stepper button{width:32px;height:36px;font-size:18px}
+.set-row .stepper input{width:38px;font-size:16px;padding:6px 0}
+.set-row .wsel{min-width:0;flex:1 1 90px;padding:7px 8px;background:var(--surface)}
+.set-bw{flex:1 1 90px;font-size:13px;color:var(--muted)}
+.log{margin-left:auto;min-width:88px;height:38px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:700;font-size:14px}
+.log.on{background:var(--ok);font-size:20px}
+.set-actions{display:flex;gap:16px;flex-wrap:wrap}
+.start-n.ok{background:var(--ok)}

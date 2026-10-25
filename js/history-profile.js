@@ -5,8 +5,9 @@ function renderHistory(){const ss=[...D().sessions].reverse(),v=$('#view-history
  if(!ss.length){v.innerHTML='<p class="empty">Noch kein Training gespeichert.</p>';return;}
  const vol=s=>s.entries.reduce((a,e)=>a+e.sets.reduce((b,x)=>b+(x.w||0)*x.r*(byId[e.exId]?.kbCount||1),0),0);
  // Pro Übung: Gewicht, Anzahl Sätze und Wiederholungen
- const exLine=e=>{const ex=byId[e.exId],rs=[...new Set(e.sets.map(x=>x.r))],w=e.sets[0]?.w;
-  return`${ex&&ex.kbCount&&w?`${w} kg${ex.kbCount===2?' × 2':''}, `:''}${e.sets.length} ${e.sets.length===1?'Satz':'Sätze'} × ${rs.join('/')} Wdh.`;};
+ const exLine=e=>{const ex=byId[e.exId],kb=ex&&ex.kbCount,rs=e.sets.map(x=>x.r),ws=[...new Set(e.sets.map(x=>x.w))];
+  const reps=rs.every(r=>r===rs[0])?`${rs[0]}`:rs.join('/'),n=e.sets.length;
+  return`${kb&&ws[0]?`${ws.join('/')} kg${kb===2?' × 2':''}, `:''}${n} ${n===1?'Satz':'Sätze'} × ${reps} Wdh.`;};
  v.innerHTML=ss.map(s=>`<details class="card hist-item"><summary><h3>${esc(s.name)}</h3><div class="meta">${fmtDate(s.date)}, ${s.entries.length} Übungen${vol(s)?`, ${Math.round(vol(s)).toLocaleString('de-DE')} kg bewegt`:''}</div></summary>
   ${s.entries.map(e=>`<div class="hist-ex"><b>${esc(byId[e.exId]?.name||e.exId)}</b>${exLine(e)}</div>`).join('')}
   <div class="btn-row"><button class="btn" data-repeat="${s.id}">Training wiederholen</button><button class="btn danger" data-delsess="${s.id}">Löschen</button></div></details>`).join('');
@@ -15,7 +16,8 @@ function renderHistory(){const ss=[...D().sessions].reverse(),v=$('#view-history
 // Training wiederholen: gleiche Übungen, aber mit den aktuellen Werten (letztes Training bzw. aktuelles Gewicht)
 function repeatSession(id){const s=D().sessions.find(x=>x.id===id),d=D().draft;if(!s)return;
  if(d.items.length&&!confirm('Die aktuelle Auswahl im Workout wird ersetzt. Fortfahren?'))return;
- d.items=s.entries.filter(e=>byId[e.exId]).map(e=>{const ex=byId[e.exId],pl=defaultPlan(ex);return{exId:e.exId,sets:pl.sets,reps:pl.reps,w:ex.kbCount?defaultWeight(ex):0};});
+ d.items=s.entries.filter(e=>byId[e.exId]).map(e=>{const ex=byId[e.exId],pl=defaultPlan(ex);return{exId:e.exId,reps:pl.reps,w:ex.kbCount?defaultWeight(ex):0};});
+ const e0=s.entries[0];d.cfg={sets:e0?e0.sets.length:settings().sets,drop:!!(e0&&e0.sets.length>1&&e0.sets.every((x,i)=>i===0||x.r===e0.sets[i-1].r-1))};
  d.name=s.name||'';save();toast('Training übernommen');go('workout');}
 
 // ---------- Profil
