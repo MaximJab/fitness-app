@@ -28,7 +28,9 @@ const ICON_UP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 
 const fmtKg=v=>Math.round(v).toLocaleString('de-DE');
 
 // ---------- Workout-Einstellungen: Sätze gelten für alle Übungen, optional abfallende Wiederholungen
-const cfg=()=>{const d=D().draft;if(!d.cfg)d.cfg={sets:settings().sets,drop:false};return d.cfg;};
+const cfg=()=>{const d=D().draft;if(!d.cfg)d.cfg={sets:settings().sets,drop:false,log:true};if(d.cfg.log==null)d.cfg.log=true;return d.cfg;};
+// Sätze einzeln einloggen? Ohne Einloggen wird beim Beenden der Plan gespeichert
+const logsSets=A=>!(A&&A.cfg&&A.cfg.log===false);
 // Wiederholungen je Satz, z. B. 10 · 9 · 8 bei abfallenden Wiederholungen
 const planReps=(reps,c)=>Array.from({length:c.sets},(_,i)=>c.drop?Math.max(1,reps-i):reps);
 function planVolume(items,c){return items.reduce((a,it)=>{const ex=byId[it.exId];if(!ex||!ex.kbCount)return a;return a+planReps(it.reps,c).reduce((b,r)=>b+r*wOf(it)*ex.kbCount,0);},0);}
@@ -73,7 +75,7 @@ function renderWorkout(){migrateTraining();const d=D().draft,v=$('#view-workout'
  $('#clear').onclick=()=>{if(!confirm('Workout leeren?'))return;d.items=[];d.name='';save();render();};}
 // Workout unter einem Namen im Reiter „Gespeichert“ ablegen
 function saveTemplate(items,cur,c){const name=(cur||'').trim()||prompt('Name für das Workout:','Mein Workout');if(!name)return null;
- const ex=D().templates.find(t=>t.name===name),tc=c?{sets:c.sets,drop:!!c.drop}:undefined;
+ const ex=D().templates.find(t=>t.name===name),tc=c?{sets:c.sets,drop:!!c.drop,log:c.log!==false}:undefined;
  if(ex){if(!confirm(`„${name}“ überschreiben?`))return null;ex.items=items;if(tc)ex.cfg=tc;}else D().templates.push({id:uid(),name,items,...(tc?{cfg:tc}:{})});
  save();toast(`„${name}“ gespeichert`);return name;}
 
@@ -84,12 +86,14 @@ function openSetup(){const d=D().draft,c=cfg();d.items.forEach(normItem);
  openSheetBody(`<p class="step-no">Schritt 1 von 2</p><h2 class="start-title">Workout einstellen</h2><p class="note">${d.items.length} Übungen. Die Einstellungen gelten für alle Übungen.</p>
  <div class="card setup"><h3>Sätze pro Übung</h3><div class="wrow"><div class="stepper"><button type="button" id="cfgMinus" aria-label="Weniger Sätze">−</button><input type="number" inputmode="numeric" min="1" max="20" id="cfgSets" value="${c.sets}" aria-label="Sätze pro Übung"><button type="button" id="cfgPlus" aria-label="Mehr Sätze">+</button></div><span>Sätze</span></div></div>
  <label class="card setup toggle"><input type="checkbox" id="cfgDrop"${c.drop?' checked':''}><span><b>Abfallende Wiederholungen</b><small>Pro Satz eine Wiederholung weniger.</small></span></label>
+ <label class="card setup toggle"><input type="checkbox" id="cfgLog"${c.log?' checked':''}><span><b>Jeden Satz einloggen</b><small>Wiederholungen und Gewicht pro Satz im Training eintragen. Ohne Einloggen wird beim Beenden der Plan so gespeichert, wie er hier steht.</small></span></label>
  <div class="card setup-demo"><h3>So sieht ein Satzplan aus</h3><p class="note" id="cfgDemoName">${esc(ex0?byId[ex0.exId].name:'Beispiel')}, ${demo} Wiederholungen</p><div class="reps-pills" id="cfgDemo"></div></div>
  <button class="btn" id="cfgDone">Einstellungen abschließen</button><button class="btn sec" id="cfgBack">Zurück</button>`);
  const demoPaint=()=>{$('#cfgDemo').innerHTML=planReps(demo,c).map((r,i)=>`<span><small>Satz ${i+1}</small>${r}</span>`).join('');};
  const setS=n=>{c.sets=Math.max(1,Math.min(20,Math.round(n)||1));$('#cfgSets').value=c.sets;save();demoPaint();};
  $('#cfgMinus').onclick=()=>setS(c.sets-1);$('#cfgPlus').onclick=()=>setS(c.sets+1);$('#cfgSets').onchange=e=>setS(parseInt(e.target.value));
  $('#cfgDrop').onchange=e=>{c.drop=e.target.checked;save();demoPaint();};
+ $('#cfgLog').onchange=e=>{c.log=e.target.checked;save();};
  demoPaint();$('#cfgDone').onclick=openOverview;$('#cfgBack').onclick=()=>{closeStart();renderWorkout();};}
 
 // ---------- Schritt 2: Übersicht des Workouts
@@ -97,7 +101,7 @@ function openOverview(){const d=D().draft,c=cfg(),items=d.items.filter(it=>byId[
  const totalSets=items.length*c.sets,totalReps=items.reduce((a,it)=>a+planReps(it.reps,c).reduce((b,r)=>b+r,0),0),vol=planVolume(items,c);
  openSheetBody(`<p class="step-no">Schritt 2 von 2</p><h2 class="start-title">${esc(d.name||'Dein Workout')}</h2>
  <div class="ov-stats"><div><b>${items.length}</b><span>Übungen</span></div><div><b>${totalSets}</b><span>Sätze</span></div><div><b>${totalReps}</b><span>Wiederholungen</span></div><div><b>${vol?fmtKg(vol):'–'}</b><span>kg bewegt</span></div></div>
- <p class="note">${c.sets} ${c.sets===1?'Satz':'Sätze'} pro Übung${c.drop?', abfallende Wiederholungen':''}</p>
+ <p class="note">${c.sets} ${c.sets===1?'Satz':'Sätze'} pro Übung${c.drop?', abfallende Wiederholungen':''}, ${c.log?'jeder Satz wird eingeloggt':'ohne Einloggen der Sätze'}</p>
  <ol class="start-list ov-list">${items.map((it,i)=>{const ex=byId[it.exId];
   return`<li><span class="start-n">${i+1}</span>${ex.keys?`<canvas class="start-img thumb" width="160" height="160" data-ex="${ex.id}"></canvas>`:'<span class="start-img"></span>'}
   <div class="ov-body"><b>${esc(ex.name)}</b>${ex.kbCount?`<span class="wt">${wOf(it)} kg${ex.kbCount===2?' × 2':''}</span>`:`<small>${esc(ex.equip||'Körpergewicht')}</small>`}
@@ -113,7 +117,7 @@ function openStart(){openSetup();}
 function closeStart(){$('#startSheet').hidden=true;document.body.style.overflow='';observeThumbs();}
 
 // ---------- Training: jeder Satz wird einzeln eingeloggt
-function renderTraining(){const A=D().active,v=$('#view-workout');
+function renderTraining(){const A=D().active,v=$('#view-workout');if(!logsSets(A)){renderTrainingPlan();return;}
  const since=new Date(A.startedAt||Date.now()).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
  const all=A.items.reduce((a,it)=>a+it.sets.length,0),done=A.items.reduce((a,it)=>a+it.sets.filter(s=>s.done).length,0);
  v.innerHTML=`<div class="train-head"><b>${esc(A.name||'Training')}</b><span>seit ${since} Uhr · ${done}/${all} Sätze</span></div>
@@ -136,16 +140,31 @@ function renderTraining(){const A=D().active,v=$('#view-workout');
  v.querySelectorAll('[data-rmset]').forEach(b=>b.onclick=()=>{const it=A.items[+b.dataset.rmset];if(it.sets.length>1)it.sets.pop();save();renderTraining();});
  v.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openSheet(b.dataset.open));
  observeThumbs();
- // Zurück: Übungen wandern zurück in die Workout-Zusammenstellung
+ bindTrainingButtons(A);}
+// Training ohne Einloggen: Plan anzeigen, beim Beenden komplett speichern
+function renderTrainingPlan(){const A=D().active,v=$('#view-workout');
+ const since=new Date(A.startedAt||Date.now()).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+ v.innerHTML=`<div class="train-head"><b>${esc(A.name||'Training')}</b><span>seit ${since} Uhr</span></div>
+ ${A.items.map((it,i)=>{const ex=byId[it.exId];if(!ex)return'';
+  return`<div class="card ex-card train-card"><div class="ex-head"><span class="start-n">${i+1}</span>${thumbHtml(ex)}<button class="name" data-open="${ex.id}">${esc(ex.name)}<small>${ex.kbCount?`${it.w} kg${ex.kbCount===2?' × 2':''}`:esc(ex.equip||'Körpergewicht')}</small></button></div>
+  <div class="reps-pills">${it.sets.map((s,j)=>`<span><small>Satz ${j+1}</small>${s.r}</span>`).join('')}</div></div>`;}).join('')}
+ <p class="note">Die Sätze werden nicht einzeln eingeloggt. Beim Beenden wird der Plan so im Verlauf gespeichert.</p>
+ <button class="btn" id="trEnd">Workout beenden</button><div class="btn-row"><button class="btn sec" id="trSave">Workout speichern</button><button class="btn sec" id="trBack">Zurück</button></div>`;
+ v.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openSheet(b.dataset.open));observeThumbs();
+ bindTrainingButtons(A);}
+function bindTrainingButtons(A){
  $('#trBack').onclick=()=>{const d=D().draft;A.items.forEach(it=>{if(!d.items.some(x=>x.exId===it.exId))d.items.push({exId:it.exId,reps:it.reps,w:it.w});});
   if(!d.name)d.name=A.name||'';if(A.cfg)d.cfg={...A.cfg};delete D().active;save();window.scrollTo(0,0);render();};
- $('#trSave').onclick=()=>{const c=A.cfg||{sets:settings().sets,drop:false};const n=saveTemplate(A.items.map(it=>({exId:it.exId,sets:c.sets,reps:it.reps,w:+it.w})),A.name,c);if(n){A.name=n;save();renderTraining();}};
+ $('#trSave').onclick=()=>{const c=A.cfg||{sets:settings().sets,drop:false,log:true};const n=saveTemplate(A.items.map(it=>({exId:it.exId,sets:c.sets,reps:it.reps,w:+it.w})),A.name,c);if(n){A.name=n;save();render();}};
  $('#trEnd').onclick=finishWorkout;}
 function finishWorkout(){const A=D().active;if(!A)return;
+ if(!logsSets(A)){const entries=A.items.filter(it=>byId[it.exId]).map(it=>({exId:it.exId,sets:it.sets.map(s=>({w:byId[it.exId].kbCount?+s.w:0,r:s.r}))}));
+  if(!confirm('Workout beenden? Alle geplanten Sätze werden im Verlauf gespeichert.'))return;return storeSession(A,entries);}
  const entries=A.items.filter(it=>byId[it.exId]).map(it=>({exId:it.exId,sets:it.sets.filter(s=>s.done).map(s=>({w:byId[it.exId].kbCount?+s.w:0,r:s.r}))})).filter(e=>e.sets.length);
  const open=A.items.reduce((a,it)=>a+it.sets.filter(s=>!s.done).length,0);
  if(!entries.length){toast('Noch kein Satz eingeloggt');return;}
  if(!confirm(open?`${open} ${open===1?'Satz ist':'Sätze sind'} nicht eingeloggt und ${open===1?'wird':'werden'} nicht gespeichert. Workout trotzdem beenden?`:'Workout beenden und im Verlauf speichern?'))return;
- D().sessions.push({id:uid(),date:new Date().toISOString(),start:A.startedAt||null,name:A.name||'Training',entries});
+ storeSession(A,entries);}
+function storeSession(A,entries){D().sessions.push({id:uid(),date:new Date().toISOString(),start:A.startedAt||null,name:A.name||'Training',entries});
  entries.forEach(e=>{if(byId[e.exId].kbCount)D().weights[e.exId]=e.sets[e.sets.length-1].w;});
  delete D().active;save();toast('Workout im Verlauf gespeichert');go('history');}
